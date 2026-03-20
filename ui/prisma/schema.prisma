@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Task {
+  id              String   @id @default(cuid())
+  prompt          String
+  negative_prompt String?
+  styles          String   // JSON array string
+  sampler_name    String
+  scheduler       String
+  steps           Int
+  cfg_scale       Float
+  width           Int
+  height          Int
+  n_iter          Int
+  batch_size      Int
+  seed            Int
+  model_checkpoint String
+  status          String   @default("pending") // pending, processing, completed, failed
+  error           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  images          GeneratedImage[]
+
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+}
+
+model GeneratedImage {
+  id        String   @id @default(cuid())
+  path      String
+  isFavorite Boolean @default(false)
+
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([taskId])
+}
+
+model SdModel {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Style {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+
+model SystemConfig {
+  id        String   @id @default("default")
+  imageDir  String   @default("/home/user/ai_images")
+  updatedAt DateTime @updatedAt
+}
