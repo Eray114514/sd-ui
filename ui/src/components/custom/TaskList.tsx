@@ -346,17 +346,30 @@ export function TaskList() {
                       loading="lazy"
                     />
                     {/* Hover Overlay */}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-2 z-10">
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-2 z-10">
                       <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="secondary" size="icon" className="h-7 w-7 rounded-full bg-white/20 hover:bg-white/40 text-white border-0 backdrop-blur-md" onClick={() => handleDownloadImage(img.path)}>
+                        <button
+                          type="button"
+                          className="h-7 w-7 rounded-full bg-white/90 hover:bg-white text-foreground shadow-lg flex items-center justify-center transition-all"
+                          onClick={() => handleDownloadImage(img.path)}
+                        >
                           <DownloadIcon className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button variant="secondary" size="icon" className="h-7 w-7 rounded-full bg-white/20 hover:bg-white/40 text-white border-0 backdrop-blur-md" onClick={() => handleFavoriteImage(img.id, img.isFavorite, task.id)}>
+                        </button>
+                        <button
+                          type="button"
+                          className="h-7 w-7 rounded-full bg-white/90 hover:bg-white text-foreground shadow-lg flex items-center justify-center transition-all"
+                          onClick={() => handleFavoriteImage(img.id, img.isFavorite, task.id)}
+                        >
                           <StarIcon className={`w-3.5 h-3.5 ${img.isFavorite ? "fill-yellow-400 text-yellow-400" : ""}`} />
-                        </Button>
-                        <Button variant="secondary" size="icon" className="h-7 w-7 rounded-full bg-white/20 hover:bg-red-500/80 text-white border-0 backdrop-blur-md" title="删除图片" onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id, task.id); }}>
+                        </button>
+                        <button
+                          type="button"
+                          className="h-7 w-7 rounded-full bg-white/90 hover:bg-red-500 hover:text-white text-foreground shadow-lg flex items-center justify-center transition-all"
+                          title="删除图片"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id, task.id); }}
+                        >
                           <TrashIcon className="w-3.5 h-3.5" />
-                        </Button>
+                        </button>
                       </div>
                     </div>
                   </div>

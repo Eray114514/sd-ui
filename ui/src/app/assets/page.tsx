@@ -238,29 +238,29 @@ export default function AssetsPage() {
                       />
 
                       {/* Overlay Gradient */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-between p-4 z-10">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-between p-4 z-10">
                         <div className="flex justify-end gap-1 transition-opacity transform -translate-y-2 group-hover:translate-y-0 duration-300">
-                          <Button
-                            variant="secondary" size="icon"
-                            className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white border-0 backdrop-blur-md"
+                          <button
+                            type="button"
+                            className="h-8 w-8 rounded-full bg-white/90 hover:bg-white text-foreground shadow-lg flex items-center justify-center transition-all"
                             onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.path); }}
                           >
                             <Download className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="secondary" size="icon"
-                            className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white border-0 backdrop-blur-md"
+                          </button>
+                          <button
+                            type="button"
+                            className="h-8 w-8 rounded-full bg-white/90 hover:bg-white text-foreground shadow-lg flex items-center justify-center transition-all"
                             onClick={(e) => { e.stopPropagation(); handleFavoriteImage(img); }}
                           >
                             <Heart className={`w-4 h-4 ${img.isFavorite ? "fill-red-500 text-red-500" : ""}`} />
-                          </Button>
-                          <Button
-                            variant="secondary" size="icon"
-                            className="h-8 w-8 rounded-full bg-black/40 hover:bg-red-500/80 text-white border-0 backdrop-blur-md"
+                          </button>
+                          <button
+                            type="button"
+                            className="h-8 w-8 rounded-full bg-white/90 hover:bg-red-500 hover:text-white text-foreground shadow-lg flex items-center justify-center transition-all"
                             onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id); }}
                           >
                             <TrashIcon className="w-4 h-4" />
-                          </Button>
+                          </button>
                         </div>
 
                         <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
