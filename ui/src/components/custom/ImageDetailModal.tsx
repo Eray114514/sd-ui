@@ -154,11 +154,11 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
                       className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-destructive/10 hover:text-destructive"
                       title="删除图片"
                       onClick={() => setIsDeleteDialogOpen(true)}
-                    />
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
                   }
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </PopoverTrigger>
+                />
                 <PopoverContent className="w-64 p-4 rounded-2xl shadow-xl border-border/50" align="end">
                   <div className="flex flex-col gap-3">
                     <div className="flex items-start gap-3">

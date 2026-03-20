@@ -379,11 +379,11 @@ export function TaskList() {
                       type="button"
                       className="inline-flex items-center h-8 rounded-full text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 px-3 gap-1.5"
                       onClick={() => setDeleteTaskConfirmId(task.id)}
-                    />
+                    >
+                      <TrashIcon className="w-3.5 h-3.5" /> 删除
+                    </button>
                   }
-                >
-                  <TrashIcon className="w-3.5 h-3.5" /> 删除
-                </PopoverTrigger>
+                />
                 <PopoverContent className="w-64 p-4 rounded-2xl shadow-xl border-border/50" align="start">
                   <div className="flex flex-col gap-3">
                     <div className="flex items-start gap-3">
