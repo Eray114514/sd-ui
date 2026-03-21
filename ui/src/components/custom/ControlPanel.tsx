@@ -55,6 +55,31 @@ export function ControlPanel() {
   const [lastScrollY, setLastScrollY] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  useEffect(() => {
+    if (!isExpanded && textareaRef.current) {
+      textareaRef.current.style.height = '48px'
+      textareaRef.current.style.overflow = 'hidden'
+    }
+  }, [isExpanded])
+
+  // 监听输入框展开/折叠状态，动态调整底部间距
+  useEffect(() => {
+    const spacer = document.getElementById('bottom-spacer')
+    if (spacer) {
+      if (isExpanded) {
+        // 展开时：输入框高度 + 控制栏高度(约50px) + 最小安全距离(20px)
+        const currentHeight = textareaRef.current?.style.height
+        const inputHeight = currentHeight ? parseInt(currentHeight) : 80
+        const controlsHeight = 50 // 控制栏高度
+        const minPadding = 20 // 最小安全距离
+        spacer.style.height = (inputHeight + controlsHeight + minPadding) + 'px'
+      } else {
+        // 折叠时：只需要覆盖输入框高度(48px) + 底部padding(16px) = 64px，取整65px
+        spacer.style.height = '65px'
+      }
+    }
+  }, [isExpanded])
+
   // Scroll detection to collapse/expand
   useEffect(() => {
     const handleScroll = () => {
@@ -135,7 +160,8 @@ export function ControlPanel() {
 
       await generateApi.post('/api/generate', payload)
       toast.success(`任务已添加到队列 (${batchSize} 张图片)`)
-      setPrompt("") // 自动清空输入的文本
+      window.dispatchEvent(new CustomEvent('task-created'))
+      setPrompt("")
     } catch (e: any) {
       const errorMessage = e?.response?.data?.error || e?.message || "未知错误"
       const statusCode = e?.response?.status
@@ -175,13 +201,11 @@ export function ControlPanel() {
   const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPrompt(e.target.value)
 
-    // Auto resize
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
       const newHeight = Math.min(textareaRef.current.scrollHeight, 300)
       textareaRef.current.style.height = newHeight + 'px'
 
-      // Update spacer height
       const spacer = document.getElementById('bottom-spacer')
       if (spacer) {
         spacer.style.height = (newHeight + 120) + 'px'

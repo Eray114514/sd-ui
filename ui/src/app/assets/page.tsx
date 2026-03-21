@@ -3,10 +3,11 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import axios from "axios"
 import { ImageDetailModal } from "@/components/custom/ImageDetailModal"
-import { Loader2, Search, Filter, Clock, Heart, Download, TrashIcon } from "lucide-react"
+import { Loader2, Search, Filter, Clock, Heart, Download, TrashIcon, AlertCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { ASSETS_PAGE_SIZE } from "@/lib/constants"
 
@@ -30,6 +31,7 @@ export default function AssetsPage() {
   const [activeTab, setActiveTab] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [page, setPage] = useState(0)
+  const [deleteImageConfirmId, setDeleteImageConfirmId] = useState<string | null>(null)
 
   const observer = useRef<IntersectionObserver | null>(null)
 
@@ -237,31 +239,60 @@ export default function AssetsPage() {
                         loading="lazy"
                       />
 
-                      {/* Overlay Gradient */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-between p-4 z-10">
-                        <div className="flex justify-end gap-1 transition-opacity transform -translate-y-2 group-hover:translate-y-0 duration-300">
-                          <button
-                            type="button"
-                            className="h-8 w-8 rounded-full bg-white/90 hover:bg-white text-foreground shadow-lg flex items-center justify-center transition-all"
+                      {/* Overlay Gradient - 只在底部显示信息，顶部按钮区域单独处理 */}
+                      <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-3 z-10">
+                        <div className="flex justify-end gap-2 transition-opacity transform -translate-y-2 group-hover:translate-y-0 duration-200">
+                          <Button
+                            variant="secondary" 
+                            size="icon"
+                            className="h-9 w-9 rounded-full bg-black/40 hover:bg-black/60 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95"
                             onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.path); }}
                           >
                             <Download className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            className="h-8 w-8 rounded-full bg-white/90 hover:bg-white text-foreground shadow-lg flex items-center justify-center transition-all"
+                          </Button>
+                          <Button
+                            variant="secondary" 
+                            size="icon"
+                            className="h-9 w-9 rounded-full bg-black/40 hover:bg-black/60 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95"
                             onClick={(e) => { e.stopPropagation(); handleFavoriteImage(img); }}
                           >
                             <Heart className={`w-4 h-4 ${img.isFavorite ? "fill-red-500 text-red-500" : ""}`} />
-                          </button>
-                          <button
-                            type="button"
-                            className="h-8 w-8 rounded-full bg-white/90 hover:bg-red-500 hover:text-white text-foreground shadow-lg flex items-center justify-center transition-all"
-                            onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id); }}
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
+                          </Button>
+                          <Popover open={deleteImageConfirmId === img.id} onOpenChange={(open) => setDeleteImageConfirmId(open ? img.id : null)}>
+                            <PopoverTrigger
+                              render={
+                                <button
+                                  type="button"
+                                  className="h-9 w-9 rounded-full bg-black/40 hover:bg-red-500/80 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95 flex items-center justify-center"
+                                  onClick={() => setDeleteImageConfirmId(img.id)}
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </button>
+                              }
+                            />
+                            <PopoverContent className="w-64 p-4 rounded-2xl shadow-xl border-border/50" align="end" side="top" sideOffset={8}>
+                              <div className="flex flex-col gap-3">
+                                <div className="flex items-start gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-500/20 flex items-center justify-center shrink-0">
+                                    <AlertCircle className="w-5 h-5 text-orange-500" />
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <h4 className="text-sm font-semibold text-foreground">确认删除这张图片吗？</h4>
+                                    <p className="text-xs text-muted-foreground">删除的图片无法找回</p>
+                                  </div>
+                                </div>
+                                <div className="flex justify-end gap-2 mt-2">
+                                  <Button variant="outline" size="sm" className="h-8 rounded-full px-4 text-xs font-medium" onClick={() => setDeleteImageConfirmId(null)}>取消</Button>
+                                  <Button variant="default" size="sm" className="h-8 rounded-full px-4 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium" onClick={() => { setDeleteImageConfirmId(null); handleDeleteImage(img.id); }}>确定删除</Button>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </div>
+                      </div>
+
+                      {/* 底部信息区域 - 保持渐变背景 */}
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-4 z-10">
 
                         <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                           <p className="text-white text-xs line-clamp-2 font-medium mb-2 opacity-90">

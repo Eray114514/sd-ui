@@ -169,10 +169,11 @@ export function TaskList() {
         sampler_name: task.sampler_name,
         steps: task.steps,
         cfg_scale: task.cfg_scale,
-        seed: -1 // New seed
+        seed: -1
       }
       await axios.post('/api/generate', payload)
       toast.success("重新生成任务已添加到队列")
+      window.dispatchEvent(new CustomEvent('task-created'))
     } catch (e) {
       toast.error("重新生成失败")
     }
@@ -221,10 +222,27 @@ export function TaskList() {
       }
     }
 
-    fetchTasks()
-    const interval = setInterval(fetchTasks, 3000)
-    return () => clearInterval(interval)
-  }, [])
+    const handleTaskCreated = () => {
+       fetchTasks()
+     }
+
+     fetchTasks()
+     const interval = setInterval(fetchTasks, 3000)
+     const statusInterval = setInterval(() => {
+       const hasProcessingOrPending = tasks.some((t: any) =>
+         t.status === 'pending' || t.status === 'processing'
+       )
+       if (hasProcessingOrPending) {
+         fetchTasks()
+       }
+     }, 2000)
+     window.addEventListener('task-created', handleTaskCreated)
+     return () => {
+       clearInterval(interval)
+       clearInterval(statusInterval)
+       window.removeEventListener('task-created', handleTaskCreated)
+     }
+   }, [tasks])
 
   const handleCopyPrompt = (prompt: string) => {
     navigator.clipboard.writeText(prompt)
@@ -345,31 +363,56 @@ export function TaskList() {
                       className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"
                     />
-                    {/* Hover Overlay */}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-2 z-10">
-                      <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          className="h-7 w-7 rounded-full bg-white/90 hover:bg-white text-foreground shadow-lg flex items-center justify-center transition-all"
+                    {/* Hover Overlay - 只在按钮区域显示暗色背景，不影响图片主体 */}
+                    <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-2 z-10">
+                      <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <Button 
+                          variant="secondary" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/40 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95" 
                           onClick={() => handleDownloadImage(img.path)}
                         >
                           <DownloadIcon className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          className="h-7 w-7 rounded-full bg-white/90 hover:bg-white text-foreground shadow-lg flex items-center justify-center transition-all"
+                        </Button>
+                        <Button 
+                          variant="secondary" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/40 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95" 
                           onClick={() => handleFavoriteImage(img.id, img.isFavorite, task.id)}
                         >
                           <StarIcon className={`w-3.5 h-3.5 ${img.isFavorite ? "fill-yellow-400 text-yellow-400" : ""}`} />
-                        </button>
-                        <button
-                          type="button"
-                          className="h-7 w-7 rounded-full bg-white/90 hover:bg-red-500 hover:text-white text-foreground shadow-lg flex items-center justify-center transition-all"
-                          title="删除图片"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id, task.id); }}
-                        >
-                          <TrashIcon className="w-3.5 h-3.5" />
-                        </button>
+                        </Button>
+                        <Popover open={deleteImageConfirmId === img.id} onOpenChange={(open) => setDeleteImageConfirmId(open ? img.id : null)}>
+                          <PopoverTrigger
+                            render={
+                              <button
+                                type="button"
+                                className="h-8 w-8 rounded-full bg-white/20 hover:bg-red-500/80 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95 flex items-center justify-center"
+                                title="删除图片"
+                                onClick={() => setDeleteImageConfirmId(img.id)}
+                              >
+                                <TrashIcon className="w-3.5 h-3.5" />
+                              </button>
+                            }
+                          />
+                          <PopoverContent className="w-64 p-4 rounded-2xl shadow-xl border-border/50" align="end" side="top" sideOffset={8}>
+                            <div className="flex flex-col gap-3">
+                              <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-500/20 flex items-center justify-center shrink-0">
+                                  <AlertCircle className="w-5 h-5 text-orange-500" />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <h4 className="text-sm font-semibold text-foreground">确认删除这张图片吗？</h4>
+                                  <p className="text-xs text-muted-foreground">删除的图片无法找回</p>
+                                </div>
+                              </div>
+                              <div className="flex justify-end gap-2 mt-2">
+                                <Button variant="outline" size="sm" className="h-8 rounded-full px-4 text-xs font-medium" onClick={() => setDeleteImageConfirmId(null)}>取消</Button>
+                                <Button variant="default" size="sm" className="h-8 rounded-full px-4 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium" onClick={() => { setDeleteImageConfirmId(null); handleDeleteImage(img.id, task.id); }}>确定删除</Button>
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
                   </div>
@@ -524,9 +567,9 @@ export function TaskList() {
             <div className="h-px bg-border/40 w-full my-4" />
           </div>
         ))}
-        {/* Bottom Spacer to dynamically prevent overlap with input box based on input box height */}
+        {/* Bottom Spacer - 动态高度以适应输入框，折叠时65px，展开时动态计算 */}
         <div ref={bottomRef} />
-        <div id="bottom-spacer" className="h-[150px] transition-all duration-300" />
+        <div id="bottom-spacer" className="h-[65px] transition-all duration-300" />
       </div>
     </div>
   )
