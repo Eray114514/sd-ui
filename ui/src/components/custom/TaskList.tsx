@@ -212,6 +212,7 @@ export function TaskList() {
     })
   }
 
+  // Poll for tasks from server
   useEffect(() => {
     const fetchTasks = async () => {
       try {
@@ -223,26 +224,37 @@ export function TaskList() {
     }
 
     const handleTaskCreated = () => {
-       fetchTasks()
-     }
+      fetchTasks()
+    }
 
-     fetchTasks()
-     const interval = setInterval(fetchTasks, 3000)
-     const statusInterval = setInterval(() => {
-       const hasProcessingOrPending = tasks.some((t: any) =>
-         t.status === 'pending' || t.status === 'processing'
-       )
-       if (hasProcessingOrPending) {
-         fetchTasks()
-       }
-     }, 2000)
-     window.addEventListener('task-created', handleTaskCreated)
-     return () => {
-       clearInterval(interval)
-       clearInterval(statusInterval)
-       window.removeEventListener('task-created', handleTaskCreated)
-     }
-   }, [tasks])
+    fetchTasks()
+    const interval = setInterval(fetchTasks, 3000)
+    window.addEventListener('task-created', handleTaskCreated)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('task-created', handleTaskCreated)
+    }
+  }, [])
+
+  // Poll for status updates when there are processing/pending tasks
+  useEffect(() => {
+    const checkProcessingTasks = () => {
+      const currentTasks = tasksRef.current
+      const hasProcessingOrPending = currentTasks.some((t: any) =>
+        t.status === 'pending' || t.status === 'processing'
+      )
+      if (hasProcessingOrPending) {
+        axios.get('/api/tasks')
+          .then(res => setTasks(res.data))
+          .catch(e => console.error(e))
+      }
+    }
+
+    const statusInterval = setInterval(checkProcessingTasks, 2000)
+    return () => {
+      clearInterval(statusInterval)
+    }
+  }, [])
 
   const handleCopyPrompt = (prompt: string) => {
     navigator.clipboard.writeText(prompt)
