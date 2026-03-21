@@ -43,6 +43,7 @@ export function TaskList() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const initialLoadRef = useRef(true)
   const tasksRef = useRef(tasks)
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const [deleteTaskConfirmId, setDeleteTaskConfirmId] = useState<string | null>(null)
   const [deleteImageConfirmId, setDeleteImageConfirmId] = useState<string | null>(null)
@@ -63,8 +64,6 @@ export function TaskList() {
 
   // Poll for progress when there's a processing task
   useEffect(() => {
-    let interval: NodeJS.Timeout
-
     const fetchProgress = async () => {
       try {
         const res = await axios.get('/api/progress?skip_current_image=false')
@@ -79,7 +78,7 @@ export function TaskList() {
                 current_image: res.data.current_image || null
               }
             }
-            return updated
+            return Object.keys(updated).length > 0 ? { ...prev, ...updated } : prev
           })
         }
       } catch (e) {
@@ -87,16 +86,22 @@ export function TaskList() {
       }
     }
 
-    const hasProcessing = tasks.some((t: any) => t.status === 'processing')
-    if (hasProcessing) {
+    const hasProcessing = tasksRef.current.some((t: any) => t.status === 'processing')
+    if (hasProcessing && !progressIntervalRef.current) {
       fetchProgress()
-      interval = setInterval(fetchProgress, 1000)
+      progressIntervalRef.current = setInterval(fetchProgress, 1000)
+    } else if (!hasProcessing && progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current)
+      progressIntervalRef.current = null
     }
 
     return () => {
-      if (interval) clearInterval(interval)
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current)
+        progressIntervalRef.current = null
+      }
     }
-  }, [tasks])
+  }, [tasks.length])
 
   const handleDeleteTask = async (taskId: string) => {
     try {
@@ -214,12 +219,14 @@ export function TaskList() {
 
   // Poll for tasks from server
   useEffect(() => {
+    let interval: NodeJS.Timeout
+
     const fetchTasks = async () => {
       try {
         const res = await axios.get('/api/tasks')
         setTasks(res.data)
       } catch (e) {
-        console.error(e)
+        console.error('Failed to fetch tasks:', e)
       }
     }
 
@@ -227,32 +234,26 @@ export function TaskList() {
       fetchTasks()
     }
 
-    fetchTasks()
-    const interval = setInterval(fetchTasks, 3000)
-    window.addEventListener('task-created', handleTaskCreated)
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener('task-created', handleTaskCreated)
-    }
-  }, [])
-
-  // Poll for status updates when there are processing/pending tasks
-  useEffect(() => {
-    const checkProcessingTasks = () => {
+    const checkProcessingTasks = async () => {
       const currentTasks = tasksRef.current
       const hasProcessingOrPending = currentTasks.some((t: any) =>
         t.status === 'pending' || t.status === 'processing'
       )
       if (hasProcessingOrPending) {
-        axios.get('/api/tasks')
-          .then(res => setTasks(res.data))
-          .catch(e => console.error(e))
+        await fetchTasks()
       }
     }
 
+    fetchTasks()
+    interval = setInterval(fetchTasks, 3000)
+    window.addEventListener('task-created', handleTaskCreated)
+
     const statusInterval = setInterval(checkProcessingTasks, 2000)
+
     return () => {
+      clearInterval(interval)
       clearInterval(statusInterval)
+      window.removeEventListener('task-created', handleTaskCreated)
     }
   }, [])
 
