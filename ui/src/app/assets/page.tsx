@@ -91,14 +91,15 @@ export default function AssetsPage() {
 
   const handleDeleted = (id: string) => {
     setImages(prev => {
-      const remainingImages = prev.filter(img => img.id !== id)
       const deletedImage = prev.find(img => img.id === id)
       const taskId = deletedImage?.taskId
+      const remainingImages = prev.filter(img => img.id !== id)
 
       if (taskId && selectedImage?.id === id) {
+        const taskImages = prev.filter(img => img.taskId === taskId)
+        const currentIndex = taskImages.findIndex(img => img.id === id)
         const newImages = remainingImages.filter(img => img.taskId === taskId)
         if (newImages.length > 0) {
-          const currentIndex = newImages.findIndex(img => img.id === id)
           const nextIndex = currentIndex >= newImages.length ? newImages.length - 1 : currentIndex
           const task = remainingImages.find(img => img.id === newImages[nextIndex].id)?.task || selectedImage.task
           setSelectedImage({ ...newImages[nextIndex], task })

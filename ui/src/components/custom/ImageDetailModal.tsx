@@ -79,10 +79,10 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
       await axios.delete('/api/assets', { data: { id: imageIdToDelete } })
       toast.success("图片已删除")
 
+      const currentIndex = relatedImages.findIndex(img => img.id === imageIdToDelete)
       const remainingImages = relatedImages.filter(img => img.id !== imageIdToDelete)
       if (remainingImages.length > 0) {
-        const currentIndex = remainingImages.findIndex(img => img.id === imageIdToDelete)
-        const nextIndex = currentIndex >= remainingImages.length ? 0 : currentIndex
+        const nextIndex = currentIndex >= remainingImages.length ? remainingImages.length - 1 : currentIndex
         const nextImage = remainingImages[nextIndex]
         onDeleted(imageIdToDelete)
         setCurrentImage({ ...nextImage, task: nextImage.task || currentImage.task })

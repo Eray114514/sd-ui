@@ -273,13 +273,12 @@ export function TaskList() {
        return t
      }))
      
-     // Update selectedImage if it's the one being deleted
      setSelectedImage((prev: any) => {
        if (prev && prev.id === id) {
          const taskImages = prev.task?.images || []
+         const currentIndex = taskImages.findIndex((img: any) => img.id === id)
          const newImages = taskImages.filter((img: any) => img.id !== id)
          if (newImages.length > 0) {
-           const currentIndex = newImages.findIndex((img: any) => img.id === id)
            const nextIndex = currentIndex >= newImages.length ? newImages.length - 1 : currentIndex
            return { ...newImages[nextIndex], task: { ...prev.task, images: newImages } }
          }
