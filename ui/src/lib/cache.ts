@@ -1,10 +1,10 @@
-interface CacheEntry<T> {
-  data: T
+interface CacheEntry {
+  data: unknown
   timestamp: number
 }
 
 class MemoryCache {
-  private cache = new Map<string, CacheEntry<any>>()
+  private cache = new Map<string, CacheEntry>()
   private ttl: number
 
   constructor(ttlSeconds: number = 10) {

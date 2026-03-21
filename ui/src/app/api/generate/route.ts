@@ -3,8 +3,14 @@ import { prisma } from '@/lib/db'
 import { processQueue } from '@/lib/queue'
 
 export async function POST(req: Request) {
+    let body
     try {
-        const body = await req.json()
+        body = await req.json()
+    } catch {
+        return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 })
+    }
+
+    try {
         const task = await prisma.task.create({
             data: {
                 prompt: body.prompt,

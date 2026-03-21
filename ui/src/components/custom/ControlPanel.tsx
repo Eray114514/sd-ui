@@ -29,11 +29,6 @@ import {
 } from "lucide-react"
 import axios from "axios"
 import { toast } from "sonner"
-
-// 创建无超时限制的 axios 实例用于生成请求
-const generateApi = axios.create({
-  timeout: 0, // 无超时限制
-})
 import { useGenerationStore } from "@/store/generationStore"
 import { cn } from "@/lib/utils"
 
@@ -158,7 +153,7 @@ export function ControlPanel() {
         cfg_scale: cfg
       }
 
-      await generateApi.post('/api/generate', payload)
+      await axios.post('/api/generate', payload)
       toast.success(`任务已添加到队列 (${batchSize} 张图片)`)
       window.dispatchEvent(new CustomEvent('task-created'))
       setPrompt("")

@@ -45,13 +45,17 @@ export async function GET(req: Request) {
     try {
         const file = fs.readFileSync(filePath)
         
-        // 4. Update database asynchronously if path changed
+        // 4. Update database if path changed
         if (shouldUpdatePath) {
-            // Update database record to point to new location
-            // We use updateMany because path is not @unique in schema, though logically it identifies a file
-            prisma.generatedImage.updateMany({
-                where: { path: originalPath },
-                data: { path: filePath }
+            prisma.generatedImage.findFirst({
+                where: { path: originalPath }
+            }).then((image) => {
+                if (image) {
+                    return prisma.generatedImage.update({
+                        where: { id: image.id },
+                        data: { path: filePath }
+                    })
+                }
             }).catch((err: any) => console.error("Failed to update image path in DB:", err))
         }
 

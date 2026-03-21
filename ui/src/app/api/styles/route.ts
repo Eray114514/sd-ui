@@ -27,15 +27,35 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { name } = await req.json()
-  const style = await prisma.style.create({ data: { name } })
-  apiCache.invalidate(cacheKeys.styles)
-  return NextResponse.json(style)
+  let name
+  try {
+    ({ name } = await req.json())
+  } catch {
+    return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  try {
+    const style = await prisma.style.create({ data: { name } })
+    apiCache.invalidate(cacheKeys.styles)
+    return NextResponse.json(style)
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
 }
 
 export async function DELETE(req: Request) {
-  const { id } = await req.json()
-  await prisma.style.delete({ where: { id } })
-  apiCache.invalidate(cacheKeys.styles)
-  return NextResponse.json({ success: true })
+  let id
+  try {
+    ({ id } = await req.json())
+  } catch {
+    return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  try {
+    await prisma.style.delete({ where: { id } })
+    apiCache.invalidate(cacheKeys.styles)
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
 }

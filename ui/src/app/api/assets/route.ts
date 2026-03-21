@@ -37,8 +37,14 @@ export async function GET(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  let id
   try {
-    const { id } = await req.json()
+    ({ id } = await req.json())
+  } catch {
+    return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  try {
     const image = await prisma.generatedImage.findUnique({ where: { id } })
 
     if (image && fs.existsSync(image.path)) {
@@ -57,8 +63,14 @@ export async function DELETE(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  let id, isFavorite
   try {
-    const { id, isFavorite } = await req.json()
+    ({ id, isFavorite } = await req.json())
+  } catch {
+    return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  try {
     const image = await prisma.generatedImage.update({
       where: { id },
       data: { isFavorite }

@@ -21,13 +21,23 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { imageDir } = await req.json()
-  const normalizedDir = normalizeImageDir(imageDir || "")
-  const config = await prisma.systemConfig.upsert({
-    where: { id: 'default' },
-    update: { imageDir: normalizedDir },
-    create: { id: "default", imageDir: normalizedDir }
-  })
-  apiCache.invalidate(cacheKeys.settings)
-  return NextResponse.json(config)
+  let imageDir
+  try {
+    ({ imageDir } = await req.json())
+  } catch {
+    return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  try {
+    const normalizedDir = normalizeImageDir(imageDir || "")
+    const config = await prisma.systemConfig.upsert({
+      where: { id: 'default' },
+      update: { imageDir: normalizedDir },
+      create: { id: "default", imageDir: normalizedDir }
+    })
+    apiCache.invalidate(cacheKeys.settings)
+    return NextResponse.json(config)
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
 }

@@ -3,18 +3,12 @@ import axios from 'axios'
 import fs from 'fs'
 import path from 'path'
 import { getDefaultImageDir, normalizeImageDir } from "./paths"
+import { SD_WEBUI_BASE_URL } from './sdConfig'
 import http from 'http'
 import https from 'https'
 
 const globalForQueue = globalThis as unknown as {
     isProcessing: boolean
-}
-
-function getWebUiBaseUrl() {
-    // NOTE TO FUTURE DEVELOPERS:
-    // This project is single-user only. Do NOT add env-based WebUI config.
-    // The WebUI IP is fixed by design.
-    return "http://192.168.2.200:7860"
 }
 
 // 创建自定义 axios 实例，确保不会超时
@@ -108,13 +102,11 @@ export async function processQueue() {
 
                 console.log(`[Queue] 调用 SD API，参数: steps=${payload.steps}, width=${payload.width}, height=${payload.height}, n_iter=${payload.n_iter}`)
 
-                // Call SD WebUI API with custom client
-                const response = await sdApiClient.post(`${getWebUiBaseUrl()}/sdapi/v1/txt2img`, payload)
+                const response = await sdApiClient.post(`${SD_WEBUI_BASE_URL}/sdapi/v1/txt2img`, payload)
 
                 const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
                 console.log(`[Queue] SD API 调用完成，耗时: ${elapsed} 秒`)
 
-                // WebUI usually returns an array of base64 images
                 const images = response.data.images;
                 if (!images || images.length === 0) {
                     throw new Error("No images returned from API");
@@ -122,9 +114,6 @@ export async function processQueue() {
 
                 console.log(`[Queue] 收到 ${images.length} 张图片`)
 
-                // We handle multiple images if n_iter > 1. 
-                // For simplicity, we can save all images and store their paths as a comma-separated string,
-                // or just pick the first one. Let's save all and join paths.
                 const config = await prisma.systemConfig.findUnique({ where: { id: 'default' } })
                 const imageDir = normalizeImageDir(config?.imageDir || getDefaultImageDir())
 
@@ -132,7 +121,7 @@ export async function processQueue() {
                     fs.mkdirSync(imageDir, { recursive: true })
                 }
 
-                const savedPaths = []
+                const savedPaths: string[] = []
                 for (let i = 0; i < images.length; i++) {
                     const filename = `${Date.now()}_${task.id}_${i}.png`
                     const filepath = path.join(imageDir, filename)
@@ -140,19 +129,19 @@ export async function processQueue() {
                     savedPaths.push(filepath)
                 }
 
-                // Create GeneratedImage records
-                await prisma.$transaction(
-                    savedPaths.map(p => prisma.generatedImage.create({
-                        data: {
-                            path: p,
-                            taskId: task.id
-                        }
-                    }))
-                )
-
-                await prisma.task.update({
-                    where: { id: task.id },
-                    data: { status: 'completed' },
+                await prisma.$transaction(async (tx) => {
+                    for (const p of savedPaths) {
+                        await tx.generatedImage.create({
+                            data: {
+                                path: p,
+                                taskId: task.id
+                            }
+                        })
+                    }
+                    await tx.task.update({
+                        where: { id: task.id },
+                        data: { status: 'completed' },
+                    })
                 })
 
                 console.log(`[Queue] 任务完成: ${task.id}`)
@@ -161,9 +150,8 @@ export async function processQueue() {
                 const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
                 const status = error?.response?.status
                 const data = error?.response?.data
-                const url = `${getWebUiBaseUrl()}/sdapi/v1/txt2img`
+                const url = `${SD_WEBUI_BASE_URL}/sdapi/v1/txt2img`
 
-                // 构建详细错误信息
                 let errorMessage = error.message || "Unknown error"
 
                 if (status === 502) {
@@ -178,7 +166,6 @@ export async function processQueue() {
                     errorMessage = "连接被重置，可能是 SD WebUI 服务重启或网络不稳定。"
                 }
 
-                // 构建详细的诊断信息
                 const detailedError = {
                     message: errorMessage,
                     timestamp: new Date().toISOString(),
@@ -186,13 +173,6 @@ export async function processQueue() {
                     requestInfo: {
                         url: url,
                         method: 'POST',
-                        payload: {
-                            steps: payload.steps,
-                            width: payload.width,
-                            height: payload.height,
-                            n_iter: payload.n_iter,
-                            model: payload.override_settings.sd_model_checkpoint
-                        }
                     },
                     errorDetails: {
                         code: error.code || 'N/A',

@@ -55,19 +55,28 @@ export const useGenerationStore = create<GenerationState>()(
       setSeed: (seed) => set({ seed }),
       setBatchSize: (batchSize) => set({ batchSize }),
 
-      fillFromTask: (task) => set({
-        prompt: task.prompt,
-        negative_prompt: task.negative_prompt || "",
-        styles: JSON.parse(task.styles || "[]"),
-        model: task.model_checkpoint,
-        width: task.width,
-        height: task.height,
-        sampler: task.sampler_name,
-        steps: task.steps,
-        cfg: task.cfg_scale,
-        seed: task.seed, // Or keep -1 if re-generating random
-        batchSize: task.n_iter || 1
-      })
+      fillFromTask: (task) => {
+        let styles: string[] = []
+        try {
+          styles = JSON.parse(task.styles || "[]")
+        } catch {
+          styles = []
+        }
+
+        set({
+          prompt: task.prompt || "",
+          negative_prompt: task.negative_prompt || "",
+          styles,
+          model: task.model_checkpoint || "",
+          width: task.width || 896,
+          height: task.height || 1152,
+          sampler: task.sampler_name || "Euler",
+          steps: task.steps || 30,
+          cfg: task.cfg_scale || 5,
+          seed: task.seed ?? -1,
+          batchSize: task.n_iter || 1
+        })
+      }
     }),
     {
       name: 'sd-ui-generation-storage',

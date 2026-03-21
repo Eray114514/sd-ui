@@ -1,0 +1,1 @@
+export const SD_WEBUI_BASE_URL = "http://192.168.2.200:7860"

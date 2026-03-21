@@ -217,10 +217,7 @@ export function TaskList() {
     })
   }
 
-  // Poll for tasks from server
   useEffect(() => {
-    let interval: NodeJS.Timeout
-
     const fetchTasks = async () => {
       try {
         const res = await axios.get('/api/tasks')
@@ -234,25 +231,12 @@ export function TaskList() {
       fetchTasks()
     }
 
-    const checkProcessingTasks = async () => {
-      const currentTasks = tasksRef.current
-      const hasProcessingOrPending = currentTasks.some((t: any) =>
-        t.status === 'pending' || t.status === 'processing'
-      )
-      if (hasProcessingOrPending) {
-        await fetchTasks()
-      }
-    }
-
     fetchTasks()
-    interval = setInterval(fetchTasks, 3000)
+    const interval = setInterval(fetchTasks, 3000)
     window.addEventListener('task-created', handleTaskCreated)
-
-    const statusInterval = setInterval(checkProcessingTasks, 2000)
 
     return () => {
       clearInterval(interval)
-      clearInterval(statusInterval)
       window.removeEventListener('task-created', handleTaskCreated)
     }
   }, [])

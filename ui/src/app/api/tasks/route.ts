@@ -21,10 +21,14 @@ export async function GET() {
 }
 
 export async function DELETE(req: Request) {
+  let id
   try {
-    const { id } = await req.json()
+    ({ id } = await req.json())
+  } catch {
+    return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 })
+  }
 
-    // Get all images for this task
+  try {
     const images = await prisma.generatedImage.findMany({
       where: { taskId: id }
     })
