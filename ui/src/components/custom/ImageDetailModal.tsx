@@ -74,19 +74,20 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   const handleDelete = async () => {
+    const imageIdToDelete = currentImage.id
     try {
-      await axios.delete('/api/assets', { data: { id: currentImage.id } })
+      await axios.delete('/api/assets', { data: { id: imageIdToDelete } })
       toast.success("图片已删除")
 
-      const remainingImages = relatedImages.filter(img => img.id !== currentImage.id)
+      const remainingImages = relatedImages.filter(img => img.id !== imageIdToDelete)
       if (remainingImages.length > 0) {
-        const currentIndex = relatedImages.findIndex(img => img.id === currentImage.id)
+        const currentIndex = relatedImages.findIndex(img => img.id === imageIdToDelete)
         const nextIndex = currentIndex >= remainingImages.length ? 0 : currentIndex
         const nextImage = remainingImages[nextIndex]
+        onDeleted(imageIdToDelete)
         setCurrentImage({ ...nextImage, task: nextImage.task || currentImage.task })
-        onDeleted(currentImage.id)
       } else {
-        onDeleted(currentImage.id)
+        onDeleted(imageIdToDelete)
         onClose()
       }
       setIsDeleteDialogOpen(false)

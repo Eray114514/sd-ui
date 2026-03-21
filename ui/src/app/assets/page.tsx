@@ -90,8 +90,24 @@ export default function AssetsPage() {
   }
 
   const handleDeleted = (id: string) => {
-    setImages(prev => prev.filter(img => img.id !== id))
-    setSelectedImage(null)
+    setImages(prev => {
+      const remainingImages = prev.filter(img => img.id !== id)
+      const deletedImage = prev.find(img => img.id === id)
+      const taskId = deletedImage?.taskId
+
+      if (taskId && selectedImage?.id === id) {
+        const newImages = remainingImages.filter(img => img.taskId === taskId)
+        if (newImages.length > 0) {
+          const currentIndex = prev.findIndex(img => img.id === id)
+          const nextIndex = currentIndex >= newImages.length ? newImages.length - 1 : currentIndex
+          setSelectedImage({ ...newImages[nextIndex], task: selectedImage.task })
+        } else {
+          setSelectedImage(null)
+        }
+      }
+
+      return remainingImages
+    })
   }
 
   const handleDeleteImage = async (id: string) => {
