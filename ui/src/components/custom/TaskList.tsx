@@ -44,6 +44,8 @@ export function TaskList() {
   const initialLoadRef = useRef(true)
   const tasksRef = useRef(tasks)
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const fetchIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const isPageVisibleRef = useRef(true)
 
   const [deleteTaskConfirmId, setDeleteTaskConfirmId] = useState<string | null>(null)
   const [deleteImageConfirmId, setDeleteImageConfirmId] = useState<string | null>(null)
@@ -62,9 +64,22 @@ export function TaskList() {
     }
   }, [tasks.length, Object.keys(progressData).length])
 
+  // Visibility change handler - pause polling when page is hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      isPageVisibleRef.current = !document.hidden
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
   // Poll for progress when there's a processing task
   useEffect(() => {
     const fetchProgress = async () => {
+      if (!isPageVisibleRef.current) return
       try {
         const res = await axios.get('/api/progress?skip_current_image=false')
         if (res.data) {
@@ -219,6 +234,7 @@ export function TaskList() {
 
   useEffect(() => {
     const fetchTasks = async () => {
+      if (!isPageVisibleRef.current) return
       try {
         const res = await axios.get('/api/tasks')
         setTasks(res.data)
@@ -232,11 +248,14 @@ export function TaskList() {
     }
 
     fetchTasks()
-    const interval = setInterval(fetchTasks, 3000)
+    fetchIntervalRef.current = setInterval(fetchTasks, 3000)
     window.addEventListener('task-created', handleTaskCreated)
 
     return () => {
-      clearInterval(interval)
+      if (fetchIntervalRef.current) {
+        clearInterval(fetchIntervalRef.current)
+        fetchIntervalRef.current = null
+      }
       window.removeEventListener('task-created', handleTaskCreated)
     }
   }, [])
@@ -260,11 +279,11 @@ export function TaskList() {
          const taskImages = prev.task?.images || []
          const newImages = taskImages.filter((img: any) => img.id !== id)
          if (newImages.length > 0) {
-           const currentIndex = taskImages.findIndex((img: any) => img.id === id)
+           const currentIndex = newImages.findIndex((img: any) => img.id === id)
            const nextIndex = currentIndex >= newImages.length ? newImages.length - 1 : currentIndex
            return { ...newImages[nextIndex], task: { ...prev.task, images: newImages } }
          }
-         return null // Close modal if no images left
+         return null
        }
        return prev
      })

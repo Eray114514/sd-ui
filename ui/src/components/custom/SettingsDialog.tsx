@@ -122,9 +122,9 @@ export function SettingsDialog() {
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger
                 render={
-                    <div className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors p-2" title="系统设置">
+                    <button className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors p-2" title="系统设置" type="button">
                         <Menu className="w-6 h-6" />
-                    </div>
+                    </button>
                 }
             />
             <DialogContent className="max-w-2xl h-[80vh] flex flex-col">

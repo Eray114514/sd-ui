@@ -81,7 +81,7 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
 
       const remainingImages = relatedImages.filter(img => img.id !== imageIdToDelete)
       if (remainingImages.length > 0) {
-        const currentIndex = relatedImages.findIndex(img => img.id === imageIdToDelete)
+        const currentIndex = remainingImages.findIndex(img => img.id === imageIdToDelete)
         const nextIndex = currentIndex >= remainingImages.length ? 0 : currentIndex
         const nextImage = remainingImages[nextIndex]
         onDeleted(imageIdToDelete)
