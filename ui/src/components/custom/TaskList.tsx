@@ -301,7 +301,7 @@ export function TaskList() {
       )}
       <div className="flex flex-col gap-10">
         {tasks.map((task, index) => (
-          <div key={task.id} className="flex flex-col gap-4">
+          <div key={task.id} className="flex flex-col gap-4" style={{ contentVisibility: 'auto', containIntrinsicSize: '0 400px' }}>
             {/* Task Header */}
             <div className="flex flex-col gap-2">
               <div className="text-sm text-muted-foreground">

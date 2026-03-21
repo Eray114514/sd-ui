@@ -8,6 +8,7 @@ export async function GET() {
       { createdAt: 'asc' },
       { id: 'asc' }
     ],
+    take: 500,
     include: { images: true }
   })
   return NextResponse.json(tasks, {
