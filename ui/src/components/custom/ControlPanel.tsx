@@ -48,32 +48,23 @@ export function ControlPanel() {
   const [availableStyles, setAvailableStyles] = useState<{ id: string, name: string }[]>([])
   const [isExpanded, setIsExpanded] = useState(true)
   const [lastScrollY, setLastScrollY] = useState(0)
+  const [textareaHeight, setTextareaHeight] = useState(80)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    if (!isExpanded && textareaRef.current) {
-      textareaRef.current.style.height = '48px'
-      textareaRef.current.style.overflow = 'hidden'
-    }
-  }, [isExpanded])
 
   // 监听输入框展开/折叠状态，动态调整底部间距
   useEffect(() => {
     const spacer = document.getElementById('bottom-spacer')
     if (spacer) {
       if (isExpanded) {
-        // 展开时：输入框高度 + 控制栏高度(约50px) + 最小安全距离(20px)
-        const currentHeight = textareaRef.current?.style.height
-        const inputHeight = currentHeight ? parseInt(currentHeight) : 80
-        const controlsHeight = 50 // 控制栏高度
-        const minPadding = 20 // 最小安全距离
+        const inputHeight = textareaHeight
+        const controlsHeight = 50
+        const minPadding = 20
         spacer.style.height = (inputHeight + controlsHeight + minPadding) + 'px'
       } else {
-        // 折叠时：只需要覆盖输入框高度(48px) + 底部padding(16px) = 64px，取整65px
         spacer.style.height = '65px'
       }
     }
-  }, [isExpanded])
+  }, [isExpanded, textareaHeight])
 
   // Scroll detection to collapse/expand
   useEffect(() => {
@@ -196,15 +187,12 @@ export function ControlPanel() {
   const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPrompt(e.target.value)
 
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-      const newHeight = Math.min(textareaRef.current.scrollHeight, 300)
-      textareaRef.current.style.height = newHeight + 'px'
+    const newHeight = Math.min(e.target.scrollHeight, 300)
+    setTextareaHeight(Math.max(newHeight, 48))
 
-      const spacer = document.getElementById('bottom-spacer')
-      if (spacer) {
-        spacer.style.height = (newHeight + 120) + 'px'
-      }
+    const spacer = document.getElementById('bottom-spacer')
+    if (spacer) {
+      spacer.style.height = (newHeight + 120) + 'px'
     }
   }
 
@@ -262,8 +250,9 @@ export function ControlPanel() {
               placeholder={isExpanded ? "描述你想象中的画面... (例如: 赛博朋克风格的雨夜街道，霓虹灯光)" : "请输入你的创意 (按 Enter 发送，Shift+Enter 换行)"}
               className={cn(
                 "border-none focus-visible:ring-0 resize-none bg-transparent text-sm p-4 placeholder:text-muted-foreground/60",
-                isExpanded ? "min-h-[80px] max-h-[300px] pr-32" : "h-[48px] min-h-[48px] py-3 px-4 overflow-hidden whitespace-nowrap cursor-pointer flex-1 w-full"
+                isExpanded ? "pr-32" : "h-[48px] min-h-[48px] py-3 px-4 overflow-hidden whitespace-nowrap cursor-pointer flex-1 w-full"
               )}
+              style={isExpanded ? { height: textareaHeight + 'px', minHeight: '48px', maxHeight: '300px' } : undefined}
               onClick={() => !isExpanded && setIsExpanded(true)}
               ref={textareaRef}
             />
