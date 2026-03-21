@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -33,15 +33,21 @@ import { useGenerationStore } from "@/store/generationStore"
 import { cn } from "@/lib/utils"
 
 export function ControlPanel() {
-  const {
-    prompt, setPrompt,
-    styles: selectedStyles, setStyles: setSelectedStyles,
-    model: selectedModel, setModel: setSelectedModel,
-    width, height, setDimensions,
-    batchSize, setBatchSize,
-    cfg, setCfg,
-    steps, setSteps
-  } = useGenerationStore()
+  const prompt = useGenerationStore(state => state.prompt)
+  const setPrompt = useGenerationStore(state => state.setPrompt)
+  const selectedStyles = useGenerationStore(state => state.styles)
+  const setStyles = useGenerationStore(state => state.setStyles)
+  const selectedModel = useGenerationStore(state => state.model)
+  const setModel = useGenerationStore(state => state.setModel)
+  const width = useGenerationStore(state => state.width)
+  const height = useGenerationStore(state => state.height)
+  const setDimensions = useGenerationStore(state => state.setDimensions)
+  const batchSize = useGenerationStore(state => state.batchSize)
+  const setBatchSize = useGenerationStore(state => state.setBatchSize)
+  const cfg = useGenerationStore(state => state.cfg)
+  const setCfg = useGenerationStore(state => state.setCfg)
+  const steps = useGenerationStore(state => state.steps)
+  const setSteps = useGenerationStore(state => state.setSteps)
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [availableModels, setAvailableModels] = useState<{ id: string, name: string }[]>([])
@@ -51,19 +57,11 @@ export function ControlPanel() {
   const [textareaHeight, setTextareaHeight] = useState(80)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // 监听输入框展开/折叠状态，动态调整底部间距
   useEffect(() => {
-    const spacer = document.getElementById('bottom-spacer')
-    if (spacer) {
-      if (isExpanded) {
-        const inputHeight = textareaHeight
-        const controlsHeight = 50
-        const minPadding = 20
-        spacer.style.height = (inputHeight + controlsHeight + minPadding) + 'px'
-      } else {
-        spacer.style.height = '65px'
-      }
-    }
+    const inputHeight = textareaHeight
+    const controlsHeight = 50
+    const minPadding = 20
+    useGenerationStore.getState().setBottomSpacerHeight(isExpanded ? inputHeight + controlsHeight + minPadding : 65)
   }, [isExpanded, textareaHeight])
 
   // Scroll detection to collapse/expand
@@ -114,7 +112,7 @@ export function ControlPanel() {
         setAvailableStyles(stylesRes.data || [])
 
         if (!selectedModel && modelsRes.data?.length > 0) {
-          setSelectedModel(modelsRes.data[0].name)
+          setModel(modelsRes.data[0].name)
         }
       } catch (e) {
         console.error("Failed to fetch initial data", e)
@@ -174,9 +172,9 @@ export function ControlPanel() {
 
   const toggleStyle = (styleName: string) => {
     if (selectedStyles.includes(styleName)) {
-      setSelectedStyles(selectedStyles.filter(s => s !== styleName))
+      setStyles(selectedStyles.filter(s => s !== styleName))
     } else {
-      setSelectedStyles([...selectedStyles, styleName])
+      setStyles([...selectedStyles, styleName])
     }
   }
 
@@ -189,11 +187,6 @@ export function ControlPanel() {
 
     const newHeight = Math.min(e.target.scrollHeight, 300)
     setTextareaHeight(Math.max(newHeight, 48))
-
-    const spacer = document.getElementById('bottom-spacer')
-    if (spacer) {
-      spacer.style.height = (newHeight + 120) + 'px'
-    }
   }
 
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -302,7 +295,7 @@ export function ControlPanel() {
 
             {/* Left: Model Selector */}
             <div className="flex items-center gap-2 shrink-0">
-              <Select value={selectedModel} onValueChange={(val) => setSelectedModel(val || "")}>
+              <Select value={selectedModel} onValueChange={(val) => setModel(val || "")}>
                 <SelectTrigger className="h-9 min-w-[160px] max-w-[200px] bg-secondary/50 border-0 rounded-lg text-xs font-medium hover:bg-secondary transition-colors focus:ring-0 shadow-sm">
                   <div className="flex items-center truncate">
                     <Layers className="w-3.5 h-3.5 mr-2 text-primary shrink-0" />

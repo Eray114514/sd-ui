@@ -31,7 +31,7 @@ interface ImageDetailModalProps {
 
 export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedImages }: ImageDetailModalProps) {
   const [currentImage, setCurrentImage] = useState<GeneratedImage | null>(image)
-  const { fillFromTask } = useGenerationStore()
+  const fillFromTask = useGenerationStore(state => state.fillFromTask)
 
   useEffect(() => {
     if (image && !image.task) {

@@ -13,6 +13,7 @@ export interface GenerationState {
   cfg: number
   seed: number
   batchSize: number
+  bottomSpacerHeight: number
 
   setPrompt: (p: string) => void
   setNegativePrompt: (p: string) => void
@@ -24,6 +25,7 @@ export interface GenerationState {
   setCfg: (c: number) => void
   setSeed: (s: number) => void
   setBatchSize: (b: number) => void
+  setBottomSpacerHeight: (h: number) => void
 
   // Action to fill from existing task
   fillFromTask: (task: any) => void
@@ -43,6 +45,7 @@ export const useGenerationStore = create<GenerationState>()(
       cfg: 5,
       seed: -1,
       batchSize: 1,
+      bottomSpacerHeight: 165,
 
       setPrompt: (prompt) => set({ prompt }),
       setNegativePrompt: (negative_prompt) => set({ negative_prompt }),
@@ -54,6 +57,7 @@ export const useGenerationStore = create<GenerationState>()(
       setCfg: (cfg) => set({ cfg }),
       setSeed: (seed) => set({ seed }),
       setBatchSize: (batchSize) => set({ batchSize }),
+      setBottomSpacerHeight: (bottomSpacerHeight) => set({ bottomSpacerHeight }),
 
       fillFromTask: (task) => {
         let styles: string[] = []

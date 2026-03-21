@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import axios from "axios"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -37,7 +37,8 @@ interface ErrorDetails {
 export function TaskList() {
   const [tasks, setTasks] = useState<any[]>([])
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set())
-  const { fillFromTask } = useGenerationStore()
+  const fillFromTask = useGenerationStore(state => state.fillFromTask)
+  const bottomSpacerHeight = useGenerationStore(state => state.bottomSpacerHeight)
   const [progressData, setProgressData] = useState<Record<string, { progress: number, current_image: string | null }>>({})
   const [selectedImage, setSelectedImage] = useState<any>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -96,7 +97,7 @@ export function TaskList() {
             return Object.keys(updated).length > 0 ? { ...prev, ...updated } : prev
           })
         }
-      } catch (e) {
+      } catch {
         // ignore errors during polling
       }
     }
@@ -116,19 +117,19 @@ export function TaskList() {
         progressIntervalRef.current = null
       }
     }
-  }, [tasks.length])
+  }, [])
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleDeleteTask = useCallback(async (taskId: string) => {
     try {
       await axios.delete('/api/tasks', { data: { id: taskId } })
       setTasks(prev => prev.filter(t => t.id !== taskId))
       toast.success("任务已删除")
-    } catch (e) {
+    } catch {
       toast.error("删除任务失败")
     }
-  }
+  }, [])
 
-  const handleDeleteImage = async (imageId: string, taskId: string) => {
+  const handleDeleteImage = useCallback(async (imageId: string, taskId: string) => {
     try {
       await axios.delete('/api/assets', { data: { id: imageId } })
       setTasks(prev => prev.map(t => {
@@ -138,12 +139,12 @@ export function TaskList() {
         return t
       }))
       toast.success("图片已删除")
-    } catch (e) {
+    } catch {
       toast.error("删除图片失败")
     }
-  }
+  }, [])
 
-  const handleFavoriteImage = async (imageId: string, currentStatus: boolean, taskId: string) => {
+  const handleFavoriteImage = useCallback(async (imageId: string, currentStatus: boolean, taskId: string) => {
     try {
       const newStatus = !currentStatus
       await axios.put('/api/assets', { id: imageId, isFavorite: newStatus })
@@ -158,24 +159,24 @@ export function TaskList() {
         return t
       }))
       toast.success(newStatus ? "已收藏" : "已取消收藏")
-    } catch (e) {
+    } catch {
       toast.error("操作失败")
     }
-  }
+  }, [])
 
-  const handleDownloadImage = (path: string) => {
+  const handleDownloadImage = useCallback((path: string) => {
     const link = document.createElement("a")
     link.href = `/api/image?path=${encodeURIComponent(path)}`
     link.download = path.split(/[\\/]/).pop() || "image.png"
     link.click()
-  }
+  }, [])
 
-  const handleReEdit = (task: any) => {
+  const handleReEdit = useCallback((task: any) => {
     fillFromTask(task)
     toast.success("参数已加载到控制面板")
-  }
+  }, [fillFromTask])
 
-  const handleRegenerate = async (task: any) => {
+  const handleRegenerate = useCallback(async (task: any) => {
     try {
       const payload = {
         prompt: task.prompt,
@@ -194,12 +195,12 @@ export function TaskList() {
       await axios.post('/api/generate', payload)
       toast.success("重新生成任务已添加到队列")
       window.dispatchEvent(new CustomEvent('task-created'))
-    } catch (e) {
+    } catch {
       toast.error("重新生成失败")
     }
-  }
+  }, [])
 
-  const toggleError = (taskId: string) => {
+  const toggleError = useCallback((taskId: string) => {
     setExpandedErrors(prev => {
       const newSet = new Set(prev)
       if (newSet.has(taskId)) {
@@ -209,7 +210,7 @@ export function TaskList() {
       }
       return newSet
     })
-  }
+  }, [])
 
   const parseError = (errorStr: string): ErrorDetails | null => {
     try {
@@ -367,8 +368,8 @@ export function TaskList() {
             {task.status === 'completed' && task.images && task.images.length > 0 && (
               <div className="columns-2 sm:columns-3 md:columns-4 gap-2">
                 {task.images.map((img: any) => (
-                  <div 
-                    key={img.id} 
+                  <div
+                    key={img.id}
                     className="relative group rounded-xl overflow-hidden bg-muted border border-border/50 cursor-pointer break-inside-avoid mb-2 z-0"
                     onClick={() => setSelectedImage({ ...img, task })}
                   >
@@ -377,6 +378,7 @@ export function TaskList() {
                       alt="Generated"
                       className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"
+                      decoding="async"
                     />
                     {/* Hover Overlay - 只在按钮区域显示暗色背景，不影响图片主体 */}
                     <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-2 z-10">
@@ -584,7 +586,7 @@ export function TaskList() {
         ))}
         {/* Bottom Spacer - 动态高度以适应输入框，折叠时65px，展开时动态计算 */}
         <div ref={bottomRef} />
-        <div id="bottom-spacer" className="h-[65px] transition-all duration-300" />
+        <div id="bottom-spacer" style={{ height: `${bottomSpacerHeight}px` }} />
       </div>
     </div>
   )
