@@ -11,13 +11,19 @@ export async function GET() {
     take: 50,
     include: { images: true }
   })
-  return NextResponse.json(tasks)
+  return NextResponse.json(tasks, {
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    }
+  })
 }
 
 export async function DELETE(req: Request) {
   try {
     const { id } = await req.json()
-    
+
     // Get all images for this task
     const images = await prisma.generatedImage.findMany({
       where: { taskId: id }
