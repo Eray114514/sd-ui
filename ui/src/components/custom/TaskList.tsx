@@ -1,49 +1,32 @@
 "use client"
 
-import { useEffect, useState, useRef, useCallback, useMemo } from "react"
-import axios from "axios"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Loader2Icon, AlertCircleIcon, CheckCircleIcon, ChevronDownIcon, ChevronUpIcon, CopyIcon, TrashIcon, DownloadIcon, StarIcon, EditIcon, RefreshCwIcon, Maximize2, AlertCircle } from "lucide-react"
+import { Loader2Icon, AlertCircleIcon, CheckCircleIcon, ChevronDownIcon, ChevronUpIcon, CopyIcon, TrashIcon, DownloadIcon, StarIcon, EditIcon, RefreshCwIcon, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { useGenerationStore } from "@/store/generationStore"
 import { Button } from "@/components/ui/button"
 import { ImageDetailModal } from "@/components/custom/ImageDetailModal"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-
-interface ErrorDetails {
-  message: string
-  timestamp: string
-  elapsedTime: string
-  requestInfo: {
-    url: string
-    method: string
-    payload: {
-      steps: number
-      width: number
-      height: number
-      n_iter: number
-      model: string
-    }
-  }
-  errorDetails: {
-    code: string
-    status: string
-    responseData: any
-    stack: string
-  }
-}
+import { getTasks, deleteTask } from "@/services/tasksService"
+import { deleteAsset, updateAsset, getAssetDownloadUrl } from "@/services/assetsService"
+import { generate } from "@/services/generateService"
+import { getProgress } from "@/services/progressService"
+import { parseError } from "@/errors/errorHandler"
+import { UI_CONSTANTS } from "@/constants"
+import type { Task, GeneratedImage, ProgressData, ParsedErrorDetails, ImageWithTask } from "@/types"
 
 export function TaskList() {
-  const [tasks, setTasks] = useState<any[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set())
   const fillFromTask = useGenerationStore(state => state.fillFromTask)
   const bottomSpacerHeight = useGenerationStore(state => state.bottomSpacerHeight)
-  const [progressData, setProgressData] = useState<Record<string, { progress: number, current_image: string | null }>>({})
-  const [selectedImage, setSelectedImage] = useState<any>(null)
+  const [progressData, setProgressData] = useState<Record<string, ProgressData>>({})
+  const [selectedImage, setSelectedImage] = useState<ImageWithTask | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const initialLoadRef = useRef(true)
-  const tasksRef = useRef(tasks)
+  const tasksRef = useRef<Task[]>(tasks)
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const fetchIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const isPageVisibleRef = useRef(true)
@@ -53,7 +36,6 @@ export function TaskList() {
 
   tasksRef.current = tasks
 
-  // Auto scroll to bottom when tasks change
   useEffect(() => {
     if (bottomRef.current) {
       if (initialLoadRef.current && tasks.length > 0) {
@@ -65,7 +47,6 @@ export function TaskList() {
     }
   }, [tasks.length, Object.keys(progressData).length])
 
-  // Visibility change handler - pause polling when page is hidden
   useEffect(() => {
     const handleVisibilityChange = () => {
       isPageVisibleRef.current = !document.hidden
@@ -77,35 +58,34 @@ export function TaskList() {
     }
   }, [])
 
-  // Poll for progress when there's a processing task
   useEffect(() => {
     const fetchProgress = async () => {
       if (!isPageVisibleRef.current) return
       try {
-        const res = await axios.get('/api/progress?skip_current_image=false')
-        if (res.data) {
+        const data = await getProgress(false)
+        if (data) {
           const currentTasks = tasksRef.current
-          setProgressData(prev => {
-            const updated: Record<string, { progress: number, current_image: string | null }> = {}
-            const processingTasks = currentTasks.filter((t: any) => t.status === 'processing')
-            for (const task of processingTasks) {
-              updated[task.id] = {
-                progress: res.data.progress || 0,
-                current_image: res.data.current_image || null
-              }
+          const updated: Record<string, ProgressData> = {}
+          const processingTasks = currentTasks.filter((t: Task) => t.status === 'processing')
+          for (const task of processingTasks) {
+            updated[task.id] = {
+              progress: data.progress || 0,
+              current_image: data.current_image || null
             }
-            return Object.keys(updated).length > 0 ? { ...prev, ...updated } : prev
-          })
+          }
+          if (Object.keys(updated).length > 0) {
+            setProgressData(prev => ({ ...prev, ...updated }))
+          }
         }
       } catch {
         // ignore errors during polling
       }
     }
 
-    const hasProcessing = tasksRef.current.some((t: any) => t.status === 'processing')
+    const hasProcessing = tasksRef.current.some((t: Task) => t.status === 'processing')
     if (hasProcessing && !progressIntervalRef.current) {
       fetchProgress()
-      progressIntervalRef.current = setInterval(fetchProgress, 1000)
+      progressIntervalRef.current = setInterval(fetchProgress, UI_CONSTANTS.POLLING.PROGRESS_INTERVAL)
     } else if (!hasProcessing && progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current)
       progressIntervalRef.current = null
@@ -121,7 +101,7 @@ export function TaskList() {
 
   const handleDeleteTask = useCallback(async (taskId: string) => {
     try {
-      await axios.delete('/api/tasks', { data: { id: taskId } })
+      await deleteTask(taskId)
       setTasks(prev => prev.filter(t => t.id !== taskId))
       toast.success("任务已删除")
     } catch {
@@ -131,10 +111,10 @@ export function TaskList() {
 
   const handleDeleteImage = useCallback(async (imageId: string, taskId: string) => {
     try {
-      await axios.delete('/api/assets', { data: { id: imageId } })
+      await deleteAsset(imageId)
       setTasks(prev => prev.map(t => {
         if (t.id === taskId && t.images) {
-          return { ...t, images: t.images.filter((img: any) => img.id !== imageId) }
+          return { ...t, images: t.images.filter((img: GeneratedImage) => img.id !== imageId) }
         }
         return t
       }))
@@ -147,11 +127,11 @@ export function TaskList() {
   const handleFavoriteImage = useCallback(async (imageId: string, currentStatus: boolean, taskId: string) => {
     try {
       const newStatus = !currentStatus
-      await axios.put('/api/assets', { id: imageId, isFavorite: newStatus })
+      await updateAsset(imageId, newStatus)
       setTasks(prev => prev.map(t => {
         if (t.id === taskId && t.images) {
           return {
-            ...t, images: t.images.map((img: any) =>
+            ...t, images: t.images.map((img: GeneratedImage) =>
               img.id === imageId ? { ...img, isFavorite: newStatus } : img
             )
           }
@@ -166,22 +146,23 @@ export function TaskList() {
 
   const handleDownloadImage = useCallback((path: string) => {
     const link = document.createElement("a")
-    link.href = `/api/image?path=${encodeURIComponent(path)}`
+    link.href = getAssetDownloadUrl(path)
     link.download = path.split(/[\\/]/).pop() || "image.png"
     link.click()
   }, [])
 
-  const handleReEdit = useCallback((task: any) => {
+  const handleReEdit = useCallback((task: Task) => {
     fillFromTask(task)
     toast.success("参数已加载到控制面板")
   }, [fillFromTask])
 
-  const handleRegenerate = useCallback(async (task: any) => {
+  const handleRegenerate = useCallback(async (task: Task) => {
     try {
-      const payload = {
+      const styles = JSON.parse(task.styles || "[]")
+      await generate({
         prompt: task.prompt,
         negative_prompt: task.negative_prompt,
-        styles: JSON.parse(task.styles || "[]"),
+        styles,
         override_settings: {
           sd_model_checkpoint: task.model_checkpoint
         },
@@ -191,8 +172,7 @@ export function TaskList() {
         steps: task.steps,
         cfg_scale: task.cfg_scale,
         seed: -1
-      }
-      await axios.post('/api/generate', payload)
+      })
       toast.success("重新生成任务已添加到队列")
       window.dispatchEvent(new CustomEvent('task-created'))
     } catch {
@@ -212,33 +192,21 @@ export function TaskList() {
     })
   }, [])
 
-  const parseError = (errorStr: string): ErrorDetails | null => {
-    try {
-      const parsed = JSON.parse(errorStr)
-      if (parsed.message && parsed.errorDetails) {
-        return parsed
-      }
-    } catch {
-      // 不是JSON格式，返回null
-    }
-    return null
-  }
-
-  const copyErrorDetails = (errorDetails: ErrorDetails) => {
+  const copyErrorDetails = useCallback((errorDetails: ParsedErrorDetails) => {
     const textToCopy = JSON.stringify(errorDetails, null, 2)
     navigator.clipboard.writeText(textToCopy).then(() => {
       toast.success("错误详情已复制到剪贴板")
     }).catch(() => {
       toast.error("复制失败")
     })
-  }
+  }, [])
 
   useEffect(() => {
     const fetchTasks = async () => {
       if (!isPageVisibleRef.current) return
       try {
-        const res = await axios.get('/api/tasks')
-        setTasks(res.data)
+        const data = await getTasks()
+        setTasks(data)
       } catch (e) {
         console.error('Failed to fetch tasks:', e)
       }
@@ -249,7 +217,7 @@ export function TaskList() {
     }
 
     fetchTasks()
-    fetchIntervalRef.current = setInterval(fetchTasks, 3000)
+    fetchIntervalRef.current = setInterval(fetchTasks, UI_CONSTANTS.POLLING.TASKS_INTERVAL)
     window.addEventListener('task-created', handleTaskCreated)
 
     return () => {
@@ -261,33 +229,33 @@ export function TaskList() {
     }
   }, [])
 
-  const handleCopyPrompt = (prompt: string) => {
+  const handleCopyPrompt = useCallback((prompt: string) => {
     navigator.clipboard.writeText(prompt)
     toast.success("提示词已复制")
-  }
+  }, [])
 
-  const handleDeleted = (id: string) => {
-     setTasks(prev => prev.map(t => {
-       if (t.images) {
-         return { ...t, images: t.images.filter((img: any) => img.id !== id) }
-       }
-       return t
-     }))
-     
-     setSelectedImage((prev: any) => {
-       if (prev && prev.id === id) {
-         const taskImages = prev.task?.images || []
-         const currentIndex = taskImages.findIndex((img: any) => img.id === id)
-         const newImages = taskImages.filter((img: any) => img.id !== id)
-         if (newImages.length > 0) {
-           const nextIndex = currentIndex >= newImages.length ? newImages.length - 1 : currentIndex
-           return { ...newImages[nextIndex], task: { ...prev.task, images: newImages } }
-         }
-         return null
-       }
-       return prev
-     })
-  }
+  const handleDeleted = useCallback((id: string) => {
+    setTasks(prev => prev.map(t => {
+      if (t.images) {
+        return { ...t, images: t.images.filter((img: GeneratedImage) => img.id !== id) }
+      }
+      return t
+    }))
+
+    setSelectedImage((prev: ImageWithTask | null) => {
+      if (prev && prev.id === id) {
+        const taskImages = prev.task?.images || []
+        const currentIndex = taskImages.findIndex((img: GeneratedImage) => img.id === id)
+        const newImages = taskImages.filter((img: GeneratedImage) => img.id !== id)
+        if (newImages.length > 0) {
+          const nextIndex = currentIndex >= newImages.length ? newImages.length - 1 : currentIndex
+          return { ...newImages[nextIndex], task: { ...prev.task, images: newImages } }
+        }
+        return null
+      }
+      return prev
+    })
+  }, [])
 
   return (
     <div className="p-4 md:p-8 w-full max-w-4xl mx-auto flex flex-col gap-8 pb-[20px]">
@@ -299,13 +267,12 @@ export function TaskList() {
           isOpen={!!selectedImage}
           onClose={() => setSelectedImage(null)}
           onDeleted={handleDeleted}
-          relatedImages={selectedImage.task?.images || []}
+          relatedImages={(selectedImage.task?.images || []) as ImageWithTask[]}
         />
       )}
       <div className="flex flex-col gap-10">
         {tasks.map((task, index) => (
           <div key={task.id} className="flex flex-col gap-4" style={{ contentVisibility: 'auto', containIntrinsicSize: '0 400px' }}>
-            {/* Task Header */}
             <div className="flex flex-col gap-2">
               <div className="text-sm text-muted-foreground">
                 {new Date(task.createdAt).toLocaleString()}
@@ -316,8 +283,7 @@ export function TaskList() {
                   <CopyIcon className="w-3.5 h-3.5" />
                 </Button>
               </div>
-              
-              {/* Badges / Params */}
+
               <div className="flex flex-wrap gap-2 mt-1">
                 <Badge variant="secondary" className="bg-primary/5 text-primary hover:bg-primary/10 border-none font-normal">
                   {task.model_checkpoint || '默认模型'}
@@ -338,7 +304,6 @@ export function TaskList() {
               </div>
             </div>
 
-            {/* Progress Display */}
             {task.status === 'processing' && (
               <div className="flex flex-col gap-2 mt-2">
                 {progressData[task.id]?.current_image && (
@@ -364,14 +329,13 @@ export function TaskList() {
               </div>
             )}
 
-            {/* Images Grid */}
             {task.status === 'completed' && task.images && task.images.length > 0 && (
               <div className="columns-2 sm:columns-3 md:columns-4 gap-2">
-                {task.images.map((img: any) => (
+                {task.images.map((img: GeneratedImage) => (
                   <div
                     key={img.id}
                     className="relative group rounded-xl overflow-hidden bg-muted border border-border/50 cursor-pointer break-inside-avoid mb-2 z-0"
-                    onClick={() => setSelectedImage({ ...img, task })}
+                    onClick={() => setSelectedImage({ ...img, task } as ImageWithTask)}
                   >
                     <img
                       src={`/api/image?path=${encodeURIComponent(img.path)}`}
@@ -380,21 +344,20 @@ export function TaskList() {
                       loading="lazy"
                       decoding="async"
                     />
-                    {/* Hover Overlay - 只在按钮区域显示暗色背景，不影响图片主体 */}
                     <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-2 z-10">
                       <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        <Button 
-                          variant="secondary" 
-                          size="icon" 
-                          className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/40 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95" 
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/40 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95"
                           onClick={() => handleDownloadImage(img.path)}
                         >
                           <DownloadIcon className="w-3.5 h-3.5" />
                         </Button>
-                        <Button 
-                          variant="secondary" 
-                          size="icon" 
-                          className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/40 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95" 
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/40 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95"
                           onClick={() => handleFavoriteImage(img.id, img.isFavorite, task.id)}
                         >
                           <StarIcon className={`w-3.5 h-3.5 ${img.isFavorite ? "fill-yellow-400 text-yellow-400" : ""}`} />
@@ -437,7 +400,6 @@ export function TaskList() {
               </div>
             )}
 
-            {/* Task Actions */}
             <div className="flex items-center gap-2 mt-2">
               <Button variant="outline" size="sm" className="h-8 rounded-full text-xs" onClick={() => handleReEdit(task)}>
                 <EditIcon className="w-3.5 h-3.5 mr-1.5" /> 重新编辑
@@ -477,13 +439,11 @@ export function TaskList() {
               </Popover>
             </div>
 
-            {/* Error Display */}
             {task.status === 'failed' && task.error && (
               <div className="mt-2">
                 {(() => {
                   const parsedError = parseError(task.error)
                   if (parsedError) {
-                    // 新的详细错误格式
                     return (
                       <div className="space-y-2">
                         <div
@@ -529,12 +489,14 @@ export function TaskList() {
                                 <span className="font-mono">{parsedError.errorDetails.status}</span>
                               </div>
                             </div>
-                            <div className="pt-2 border-t border-border">
-                              <div className="text-muted-foreground mb-1">请求参数:</div>
-                              <pre className="text-[10px] bg-background p-2 rounded overflow-x-auto">
-                                {JSON.stringify(parsedError.requestInfo.payload, null, 2)}
-                              </pre>
-                            </div>
+                            {parsedError.requestInfo.payload && (
+                              <div className="pt-2 border-t border-border">
+                                <div className="text-muted-foreground mb-1">请求参数:</div>
+                                <pre className="text-[10px] bg-background p-2 rounded overflow-x-auto">
+                                  {JSON.stringify(parsedError.requestInfo.payload, null, 2)}
+                                </pre>
+                              </div>
+                            )}
                             {parsedError.errorDetails.responseData !== 'N/A' && (
                               <div className="pt-2 border-t border-border">
                                 <div className="text-muted-foreground mb-1">响应数据:</div>
@@ -558,7 +520,6 @@ export function TaskList() {
                       </div>
                     )
                   } else {
-                    // 旧格式或普通错误消息
                     return (
                       <div
                         className="text-xs text-red-600 bg-red-500/10 p-2 rounded-md cursor-pointer flex items-start gap-1"
@@ -568,7 +529,7 @@ export function TaskList() {
                         <span className={expandedErrors.has(task.id) ? "" : "line-clamp-2"}>
                           {task.error}
                         </span>
-                        {task.error.length > 50 && (
+                        {task.error && task.error.length > 50 && (
                           expandedErrors.has(task.id)
                             ? <ChevronUpIcon className="w-3 h-3 mt-0.5 shrink-0 ml-auto" />
                             : <ChevronDownIcon className="w-3 h-3 mt-0.5 shrink-0 ml-auto" />
@@ -579,12 +540,10 @@ export function TaskList() {
                 })()}
               </div>
             )}
-            
-            {/* Task Divider */}
+
             <div className="h-px bg-border/40 w-full my-4" />
           </div>
         ))}
-        {/* Bottom Spacer - 动态高度以适应输入框，折叠时65px，展开时动态计算 */}
         <div ref={bottomRef} />
         <div id="bottom-spacer" style={{ height: `${bottomSpacerHeight}px` }} />
       </div>

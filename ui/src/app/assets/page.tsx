@@ -10,24 +10,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { ASSETS_PAGE_SIZE } from "@/lib/constants"
-
-interface GeneratedImage {
-  id: string
-  path: string
-  isFavorite: boolean
-  taskId: string
-  task: {
-    prompt: string
-    [key: string]: any
-  }
-  createdAt: string
-}
+import type { ImageWithTask } from "@/types"
 
 export default function AssetsPage() {
-  const [images, setImages] = useState<GeneratedImage[]>([])
+  const [images, setImages] = useState<ImageWithTask[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null)
+  const [selectedImage, setSelectedImage] = useState<ImageWithTask | null>(null)
   const [activeTab, setActiveTab] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [page, setPage] = useState(0)
@@ -51,7 +40,7 @@ export default function AssetsPage() {
       setImages(prev => {
         if (pageNum !== undefined && pageNum > 0) {
           const existingIds = new Set(prev.map(i => i.id))
-          const uniqueNew = newImages.filter((i: GeneratedImage) => !existingIds.has(i.id))
+          const uniqueNew = newImages.filter((i: ImageWithTask) => !existingIds.has(i.id))
           return [...prev, ...uniqueNew]
         }
         return newImages
@@ -85,7 +74,7 @@ export default function AssetsPage() {
   }, [isLoading, hasMore, page])
 
 
-  const handleImageClick = (img: GeneratedImage) => {
+  const handleImageClick = (img: ImageWithTask) => {
     setSelectedImage(img)
   }
 
@@ -122,7 +111,7 @@ export default function AssetsPage() {
     }
   }
 
-  const handleFavoriteImage = async (img: GeneratedImage) => {
+  const handleFavoriteImage = async (img: ImageWithTask) => {
     try {
       const newStatus = !img.isFavorite
       await axios.put('/api/assets', { id: img.id, isFavorite: newStatus })
@@ -154,7 +143,7 @@ export default function AssetsPage() {
   )
 
   const groupedImages = useMemo(() => {
-    const groups: { date: string; images: GeneratedImage[] }[] = []
+    const groups: { date: string; images: ImageWithTask[] }[] = []
     for (const img of filteredImages) {
       const dateKey = new Date(img.createdAt).toLocaleDateString('zh-CN', {
         year: 'numeric',
@@ -178,7 +167,6 @@ export default function AssetsPage() {
   return (
     <div className="min-h-screen bg-background p-6 md:p-8 pb-[400px]">
 
-      {/* Header Area */}
       <div className="max-w-7xl mx-auto space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-end gap-4">
           <div>
@@ -200,7 +188,6 @@ export default function AssetsPage() {
           </div>
         </div>
 
-        {/* Toolbar */}
         <div className="flex flex-col md:flex-row gap-4 sticky top-0 z-30 bg-background/80 backdrop-blur-md py-4 -mx-2 px-2 border-b border-border/50 transition-all">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -224,7 +211,6 @@ export default function AssetsPage() {
           </div>
         </div>
 
-        {/* Grouped Grid - Using CSS Grid for row-based layout */}
         {groupedImages.map((group, groupIndex) => {
           const isLastGroup = groupIndex === lastGroupIndex
           const lastImageIndex = group.images.length - 1
@@ -239,7 +225,6 @@ export default function AssetsPage() {
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
               </div>
 
-              {/* CSS Grid - 5 columns, auto-fill rows */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {group.images.map((img, index) => {
                   const isLastImage = isLastGroup && index === lastImageIndex
@@ -257,11 +242,10 @@ export default function AssetsPage() {
                         loading="lazy"
                       />
 
-                      {/* Overlay Gradient - 只在底部显示信息，顶部按钮区域单独处理 */}
                       <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-3 z-10">
                         <div className="flex justify-end gap-2 transition-opacity transform -translate-y-2 group-hover:translate-y-0 duration-200">
                           <Button
-                            variant="secondary" 
+                            variant="secondary"
                             size="icon"
                             className="h-9 w-9 rounded-full bg-black/40 hover:bg-black/60 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95"
                             onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.path); }}
@@ -269,7 +253,7 @@ export default function AssetsPage() {
                             <Download className="w-4 h-4" />
                           </Button>
                           <Button
-                            variant="secondary" 
+                            variant="secondary"
                             size="icon"
                             className="h-9 w-9 rounded-full bg-black/40 hover:bg-black/60 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95"
                             onClick={(e) => { e.stopPropagation(); handleFavoriteImage(img); }}
@@ -309,7 +293,6 @@ export default function AssetsPage() {
                         </div>
                       </div>
 
-                      {/* 底部信息区域 - 保持渐变背景 */}
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-4 z-10">
 
                         <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">

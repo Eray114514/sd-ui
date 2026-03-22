@@ -11,31 +11,22 @@ import axios from "axios"
 import { toast } from "sonner"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-
-interface GeneratedImage {
-  id: string
-  path: string
-  isFavorite: boolean
-  taskId: string
-  task: any
-  createdAt: string
-}
+import type { ImageWithTask } from "@/types"
 
 interface ImageDetailModalProps {
-  image: GeneratedImage | null
+  image: ImageWithTask | null
   isOpen: boolean
   onClose: () => void
   onDeleted: (id: string) => void
-  relatedImages: GeneratedImage[]
+  relatedImages: ImageWithTask[]
 }
 
 export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedImages }: ImageDetailModalProps) {
-  const [currentImage, setCurrentImage] = useState<GeneratedImage | null>(image)
+  const [currentImage, setCurrentImage] = useState<ImageWithTask | null>(image)
   const fillFromTask = useGenerationStore(state => state.fillFromTask)
 
   useEffect(() => {
     if (image && !image.task) {
-        // If image object is incomplete (missing task), try to find it in relatedImages
         const found = relatedImages.find(img => img.id === image.id);
         if (found && found.task) {
             setCurrentImage(found);
@@ -117,7 +108,7 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
         sampler_name: task.sampler_name,
         steps: task.steps,
         cfg_scale: task.cfg_scale,
-        seed: -1 // New seed
+        seed: -1
       }
       await axios.post('/api/generate', payload)
       toast.success("重新生成任务已添加到队列")
@@ -133,8 +124,7 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
         <VisuallyHidden>
             <DialogTitle>Image Details</DialogTitle>
         </VisuallyHidden>
-        
-        {/* Left: Preview */}
+
         <div className="w-full md:w-[70%] h-[50%] md:h-full bg-black/90 relative flex items-center justify-center backdrop-blur-md">
           <img
             src={`/api/image?path=${encodeURIComponent(currentImage.path)}`}
@@ -143,9 +133,7 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
           />
         </div>
 
-        {/* Right: Details */}
         <div className="w-full md:w-[30%] h-[50%] md:h-full flex flex-col border-t md:border-t-0 md:border-l border-border bg-background overflow-hidden">
-          {/* Header */}
           <div className="p-4 border-b border-border flex justify-between items-center bg-background/95 backdrop-blur z-10 sticky top-0 shrink-0">
             <div className="text-sm text-muted-foreground font-medium">
               {new Date(currentImage.createdAt).toLocaleString()}
@@ -211,20 +199,19 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
           </div>
 
           <ScrollArea className="flex-1 min-h-0 p-4">
-            {/* Batch Thumbnails */}
             {relatedImages.length > 1 && (
               <div className="mb-6">
                 <h3 className="text-sm font-medium mb-2">批次图片</h3>
                 <div className="flex gap-2 overflow-x-auto pb-2">
                   {relatedImages.map(img => (
-                    <div 
-                      key={img.id} 
+                    <div
+                      key={img.id}
                       className={`relative w-16 h-16 rounded-md overflow-hidden cursor-pointer border-2 ${img.id === currentImage.id ? 'border-primary' : 'border-transparent'}`}
                       onClick={() => setCurrentImage({ ...img, task: img.task || currentImage.task })}
                     >
-                      <img 
-                        src={`/api/image?path=${encodeURIComponent(img.path)}`} 
-                        className="w-full h-full object-cover" 
+                      <img
+                        src={`/api/image?path=${encodeURIComponent(img.path)}`}
+                        className="w-full h-full object-cover"
                         loading="lazy"
                       />
                     </div>
@@ -233,7 +220,6 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
               </div>
             )}
 
-            {/* Prompt */}
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-medium mb-1">提示词</h3>
@@ -251,7 +237,6 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
                 </div>
               )}
 
-              {/* Parameters */}
               <div>
                 <h3 className="text-sm font-medium mb-2">生成参数</h3>
                 <div className="flex flex-wrap gap-2">
@@ -266,7 +251,6 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
             </div>
           </ScrollArea>
 
-          {/* Bottom Actions */}
           <div className="p-4 border-t border-border grid grid-cols-2 gap-3 shrink-0">
             <Button variant="outline" onClick={handleReEdit}>
               <EditIcon className="w-4 h-4 mr-2" />

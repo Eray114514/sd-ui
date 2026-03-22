@@ -24,13 +24,15 @@ import {
   Wand2,
   Layers,
   Palette,
-  Maximize,
-  ChevronUp
 } from "lucide-react"
-import axios from "axios"
 import { toast } from "sonner"
 import { useGenerationStore } from "@/store/generationStore"
 import { cn } from "@/lib/utils"
+import { getModels } from "@/services/modelsService"
+import { getStyles } from "@/services/stylesService"
+import { generate } from "@/services/generateService"
+import { RATIO_LIST, UI_CONSTANTS, SLIDER_CONSTRAINTS } from "@/constants"
+import type { Model, Style } from "@/types"
 
 export function ControlPanel() {
   const prompt = useGenerationStore(state => state.prompt)
@@ -50,8 +52,8 @@ export function ControlPanel() {
   const setSteps = useGenerationStore(state => state.setSteps)
 
   const [isGenerating, setIsGenerating] = useState(false)
-  const [availableModels, setAvailableModels] = useState<{ id: string, name: string }[]>([])
-  const [availableStyles, setAvailableStyles] = useState<{ id: string, name: string }[]>([])
+  const [availableModels, setAvailableModels] = useState<Model[]>([])
+  const [availableStyles, setAvailableStyles] = useState<Style[]>([])
   const [isExpanded, setIsExpanded] = useState(true)
   const [lastScrollY, setLastScrollY] = useState(0)
   const [textareaHeight, setTextareaHeight] = useState(80)
@@ -61,21 +63,18 @@ export function ControlPanel() {
     const inputHeight = textareaHeight
     const controlsHeight = 50
     const minPadding = 20
-    useGenerationStore.getState().setBottomSpacerHeight(isExpanded ? inputHeight + controlsHeight + minPadding : 65)
+    useGenerationStore.getState().setBottomSpacerHeight(isExpanded ? inputHeight + controlsHeight + minPadding : UI_CONSTANTS.CONTROL_PANEL.COLLAPSED_HEIGHT)
   }, [isExpanded, textareaHeight])
 
-  // Scroll detection to collapse/expand
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY
-      
-      // If the user is actively typing (textarea has focus), do not auto-collapse
+
       if (document.activeElement === textareaRef.current) {
         setLastScrollY(currentScrollY)
         return
       }
 
-      // If the user is at the very bottom of the page, keep expanded
       const isAtBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 50
       if (isAtBottom) {
         setIsExpanded(true)
@@ -83,9 +82,6 @@ export function ControlPanel() {
         return
       }
 
-      // Logic:
-      // Scroll Down (Page Down) -> Expand
-      // Scroll Up (Page Up) -> Collapse
       if (currentScrollY > lastScrollY && currentScrollY > 100) {
         setIsExpanded(true)
       } else if (currentScrollY < lastScrollY && currentScrollY > 100) {
@@ -98,21 +94,20 @@ export function ControlPanel() {
     return () => window.removeEventListener("scroll", handleScroll)
   }, [lastScrollY])
 
-  // Computed ratio string for UI
   const selectedRatio = `${width}:${height}`
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [modelsRes, stylesRes] = await Promise.all([
-          axios.get('/api/models'),
-          axios.get('/api/styles')
+        const [models, styles] = await Promise.all([
+          getModels(),
+          getStyles()
         ])
-        setAvailableModels(modelsRes.data || [])
-        setAvailableStyles(stylesRes.data || [])
+        setAvailableModels(models || [])
+        setAvailableStyles(styles || [])
 
-        if (!selectedModel && modelsRes.data?.length > 0) {
-          setModel(modelsRes.data[0].name)
+        if (!selectedModel && models?.length > 0) {
+          setModel(models[0].name)
         }
       } catch (e) {
         console.error("Failed to fetch initial data", e)
@@ -129,7 +124,7 @@ export function ControlPanel() {
 
     setIsGenerating(true)
     try {
-      const payload = {
+      await generate({
         prompt,
         styles: selectedStyles,
         override_settings: {
@@ -140,31 +135,14 @@ export function ControlPanel() {
         n_iter: batchSize,
         steps,
         cfg_scale: cfg
-      }
-
-      await axios.post('/api/generate', payload)
+      })
       toast.success(`任务已添加到队列 (${batchSize} 张图片)`)
       window.dispatchEvent(new CustomEvent('task-created'))
       setPrompt("")
-    } catch (e: any) {
-      const errorMessage = e?.response?.data?.error || e?.message || "未知错误"
-      const statusCode = e?.response?.status
-
-      let displayMessage = "创建任务失败"
-      if (statusCode === 500) {
-        displayMessage = `创建任务失败: 服务器内部错误 (${errorMessage})`
-      } else if (statusCode === 400) {
-        displayMessage = `创建任务失败: 请求参数错误 (${errorMessage})`
-      } else if (errorMessage) {
-        displayMessage = `创建任务失败: ${errorMessage}`
-      }
-
-      toast.error(displayMessage)
-      console.error("创建任务失败:", {
-        error: e,
-        response: e?.response?.data,
-        status: statusCode
-      })
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : "未知错误"
+      toast.error(`创建任务失败: ${errorMessage}`)
+      console.error("创建任务失败:", e)
     } finally {
       setIsGenerating(false)
     }
@@ -185,8 +163,8 @@ export function ControlPanel() {
   const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPrompt(e.target.value)
 
-    const newHeight = Math.min(e.target.scrollHeight, 300)
-    setTextareaHeight(Math.max(newHeight, 48))
+    const newHeight = Math.min(e.target.scrollHeight, UI_CONSTANTS.CONTROL_PANEL.MAX_TEXTAREA_HEIGHT)
+    setTextareaHeight(Math.max(newHeight, UI_CONSTANTS.CONTROL_PANEL.MIN_TEXTAREA_HEIGHT))
   }
 
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -198,23 +176,14 @@ export function ControlPanel() {
     }
   }
 
-  const ratios = [
-    { label: "1:1", w: 1024, h: 1024, icon: "Square" },
-    { label: "3:4", w: 896, h: 1152, icon: "Portrait" },
-    { label: "4:3", w: 1152, h: 896, icon: "Landscape" },
-    { label: "9:16", w: 768, h: 1344, icon: "Mobile" },
-    { label: "16:9", w: 1344, h: 768, icon: "Wide" },
-  ]
-
   return (
     <>
       <div className="fixed bottom-0 left-[80px] right-0 z-40 p-4 transition-all duration-300 pointer-events-none flex flex-col items-center">
         <div className="w-full max-w-4xl relative pointer-events-auto flex flex-col items-center">
-          {/* Scroll to Bottom Button */}
           {!isExpanded && (
             <div className="absolute -top-10 w-full flex justify-end z-50 pointer-events-none max-w-[600px] mx-auto left-0 right-0">
-              <Button 
-                variant="secondary" 
+              <Button
+                variant="secondary"
                 className="rounded-full shadow-md h-7 px-3 text-[11px] font-medium bg-background border border-border text-muted-foreground hover:text-foreground transition-all hover:scale-105 flex items-center gap-1 pointer-events-auto"
                 onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
               >
@@ -224,16 +193,14 @@ export function ControlPanel() {
             </div>
           )}
 
-          {/* Floating Panel Container */}
         <div className={cn(
           "bg-card/90 backdrop-blur-xl border border-border/60 rounded-2xl shadow-xl shadow-black/5 dark:shadow-none p-1 overflow-hidden relative w-full",
           !isExpanded && "rounded-full max-w-[600px] flex items-center pr-1"
         )}
         style={{
-          transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: `all ${UI_CONSTANTS.CONTROL_PANEL.TRANSITION_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`,
         }}>
 
-          {/* Main Input Area */}
           <div className="relative group flex items-center flex-1 w-full">
             <Textarea
               value={prompt}
@@ -249,8 +216,7 @@ export function ControlPanel() {
               onClick={() => !isExpanded && setIsExpanded(true)}
               ref={textareaRef}
             />
-            
-            {/* Collapsed Generate Button */}
+
             {!isExpanded && (
               <div className="pr-1 pl-1 shrink-0 flex items-center h-full">
                 <Button
@@ -261,8 +227,8 @@ export function ControlPanel() {
                     isGenerating && "bg-muted text-muted-foreground cursor-not-allowed"
                   )}
                   onClick={(e) => {
-                    e.stopPropagation();
-                    handleGenerate();
+                    e.stopPropagation()
+                    handleGenerate()
                   }}
                   disabled={isGenerating || !prompt.trim()}
                 >
@@ -276,7 +242,6 @@ export function ControlPanel() {
             )}
           </div>
 
-          {/* Divider */}
           {isExpanded && (
             <div
               className="h-px bg-border/50 mx-2 my-1"
@@ -284,16 +249,14 @@ export function ControlPanel() {
             />
           )}
 
-          {/* Controls Bar */}
           {isExpanded && (
             <div
               className="flex items-center justify-between px-2 py-2 gap-2 overflow-x-auto no-scrollbar"
               style={{
-                animation: 'slideDown 350ms cubic-bezier(0.4, 0, 0.2, 1) forwards',
+                animation: `slideDown ${UI_CONSTANTS.ANIMATION.SLIDE_DOWN_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
               }}
             >
 
-            {/* Left: Model Selector */}
             <div className="flex items-center gap-2 shrink-0">
               <Select value={selectedModel} onValueChange={(val) => setModel(val || "")}>
                 <SelectTrigger className="h-9 min-w-[160px] max-w-[200px] bg-secondary/50 border-0 rounded-lg text-xs font-medium hover:bg-secondary transition-colors focus:ring-0 shadow-sm">
@@ -310,10 +273,8 @@ export function ControlPanel() {
               </Select>
             </div>
 
-            {/* Right: Settings Toggles & Generate Button */}
             <div className="flex items-center gap-2 shrink-0">
 
-              {/* Style Selector Popover */}
               <Popover>
                 <PopoverTrigger
                   render={(props) => (
@@ -332,7 +293,6 @@ export function ControlPanel() {
                     </Button>
                   )}
                 />
-                {/* ... PopoverContent ... */}
                 <PopoverContent className="w-80 p-0 overflow-hidden rounded-xl border-border/50 shadow-xl" align="end" side="top" sideOffset={8}>
                   <div className="p-3 bg-muted/30 border-b border-border/50">
                     <h4 className="font-medium text-sm">艺术风格</h4>
@@ -357,7 +317,6 @@ export function ControlPanel() {
                 </PopoverContent>
               </Popover>
 
-              {/* Advanced Settings Popover */}
               <Popover>
                 <PopoverTrigger
                   render={(props) => (
@@ -375,18 +334,16 @@ export function ControlPanel() {
                     </Button>
                   )}
                 />
-                {/* ... PopoverContent ... */}
                 <PopoverContent className="w-80 p-4 rounded-xl border-border/50 shadow-xl" align="end" side="top" sideOffset={8}>
                   <div className="space-y-5">
 
-                    {/* Aspect Ratio */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-medium text-muted-foreground">画幅比例</Label>
                         <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{width}x{height}</span>
                       </div>
                       <div className="grid grid-cols-5 gap-2">
-                        {ratios.map(r => (
+                        {RATIO_LIST.map(r => (
                           <button
                             key={r.label}
                             onClick={() => handleRatioSelect(r.w, r.h)}
@@ -398,7 +355,7 @@ export function ControlPanel() {
                             )}
                             title={r.label}
                           >
-                            <div 
+                            <div
                               className={cn(
                                 "border-2 border-current rounded-[2px] mb-1 opacity-80",
                                 r.label === "1:1" && "w-4 h-4",
@@ -406,7 +363,7 @@ export function ControlPanel() {
                                 r.label === "4:3" && "w-4 h-3",
                                 r.label === "9:16" && "w-2.5 h-4",
                                 r.label === "16:9" && "w-4 h-2.5",
-                              )} 
+                              )}
                             />
                             <span className="text-[9px] font-medium leading-none">{r.label}</span>
                           </button>
@@ -414,7 +371,6 @@ export function ControlPanel() {
                       </div>
                     </div>
 
-                    {/* Batch Size */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-medium text-muted-foreground">生成数量</Label>
@@ -422,13 +378,14 @@ export function ControlPanel() {
                       </div>
                       <Slider
                         value={[batchSize]}
-                        min={1} max={8} step={1}
+                        min={SLIDER_CONSTRAINTS.batchSize.min}
+                        max={SLIDER_CONSTRAINTS.batchSize.max}
+                        step={SLIDER_CONSTRAINTS.batchSize.step}
                         onValueChange={(val) => setBatchSize(Array.isArray(val) ? val[0] : val)}
                         className="py-1"
                       />
                     </div>
 
-                    {/* Steps */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-medium text-muted-foreground">迭代步数</Label>
@@ -436,13 +393,14 @@ export function ControlPanel() {
                       </div>
                       <Slider
                         value={[steps]}
-                        min={10} max={50} step={1}
+                        min={SLIDER_CONSTRAINTS.steps.min}
+                        max={SLIDER_CONSTRAINTS.steps.max}
+                        step={SLIDER_CONSTRAINTS.steps.step}
                         onValueChange={(val) => setSteps(Array.isArray(val) ? val[0] : val)}
                         className="py-1"
                       />
                     </div>
 
-                    {/* CFG */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-medium text-muted-foreground">提示词相关性</Label>
@@ -450,7 +408,9 @@ export function ControlPanel() {
                       </div>
                       <Slider
                         value={[cfg]}
-                        min={1} max={15} step={0.5}
+                        min={SLIDER_CONSTRAINTS.cfg.min}
+                        max={SLIDER_CONSTRAINTS.cfg.max}
+                        step={SLIDER_CONSTRAINTS.cfg.step}
                         onValueChange={(val) => setCfg(Array.isArray(val) ? val[0] : val)}
                         className="py-1"
                       />
@@ -490,4 +450,3 @@ export function ControlPanel() {
     </>
   )
 }
-

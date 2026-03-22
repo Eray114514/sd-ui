@@ -1,18 +1,14 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { Task } from '@/types'
+import type { GenerationParams } from '@/types/generation'
+import { GENERATION_DEFAULTS } from '@/constants'
 
-export interface GenerationState {
+export interface GenerationState extends GenerationParams {
   prompt: string
   negative_prompt: string
   styles: string[]
   model: string
-  width: number
-  height: number
-  sampler: string
-  steps: number
-  cfg: number
-  seed: number
-  batchSize: number
   bottomSpacerHeight: number
 
   setPrompt: (p: string) => void
@@ -27,8 +23,7 @@ export interface GenerationState {
   setBatchSize: (b: number) => void
   setBottomSpacerHeight: (h: number) => void
 
-  // Action to fill from existing task
-  fillFromTask: (task: any) => void
+  fillFromTask: (task: Task) => void
 }
 
 export const useGenerationStore = create<GenerationState>()(
@@ -36,15 +31,15 @@ export const useGenerationStore = create<GenerationState>()(
     (set) => ({
       prompt: "",
       negative_prompt: "",
-      styles: ["Lasy", "NAI3起手-"],
-      model: "waiillustriousSDXL_v160.safetensors",
-      width: 896,
-      height: 1152,
-      sampler: "Euler",
-      steps: 30,
-      cfg: 5,
-      seed: -1,
-      batchSize: 1,
+      styles: GENERATION_DEFAULTS.styles,
+      model: GENERATION_DEFAULTS.model,
+      width: GENERATION_DEFAULTS.width,
+      height: GENERATION_DEFAULTS.height,
+      sampler: GENERATION_DEFAULTS.sampler,
+      steps: GENERATION_DEFAULTS.steps,
+      cfg: GENERATION_DEFAULTS.cfg,
+      seed: GENERATION_DEFAULTS.seed,
+      batchSize: GENERATION_DEFAULTS.batchSize,
       bottomSpacerHeight: 165,
 
       setPrompt: (prompt) => set({ prompt }),
@@ -57,9 +52,9 @@ export const useGenerationStore = create<GenerationState>()(
       setCfg: (cfg) => set({ cfg }),
       setSeed: (seed) => set({ seed }),
       setBatchSize: (batchSize) => set({ batchSize }),
-      setBottomSpacerHeight: (bottomSpacerHeight) => set({ bottomSpacerHeight }),
+      setBottomSpacerHeight: (bottomSpacerHeight: number) => set({ bottomSpacerHeight }),
 
-      fillFromTask: (task) => {
+      fillFromTask: (task: Task) => {
         let styles: string[] = []
         try {
           styles = JSON.parse(task.styles || "[]")
@@ -71,14 +66,14 @@ export const useGenerationStore = create<GenerationState>()(
           prompt: task.prompt || "",
           negative_prompt: task.negative_prompt || "",
           styles,
-          model: task.model_checkpoint || "",
-          width: task.width || 896,
-          height: task.height || 1152,
-          sampler: task.sampler_name || "Euler",
-          steps: task.steps || 30,
-          cfg: task.cfg_scale || 5,
-          seed: task.seed ?? -1,
-          batchSize: task.n_iter || 1
+          model: task.model_checkpoint || GENERATION_DEFAULTS.model,
+          width: task.width || GENERATION_DEFAULTS.width,
+          height: task.height || GENERATION_DEFAULTS.height,
+          sampler: task.sampler_name || GENERATION_DEFAULTS.sampler,
+          steps: task.steps || GENERATION_DEFAULTS.steps,
+          cfg: task.cfg_scale || GENERATION_DEFAULTS.cfg,
+          seed: task.seed ?? GENERATION_DEFAULTS.seed,
+          batchSize: task.n_iter || GENERATION_DEFAULTS.batchSize
         })
       }
     }),
