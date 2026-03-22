@@ -135,3 +135,15 @@
     transform: translateY(0);
   }
 }
+
+@layer utilities {
+  .pl-sidebar {
+    @apply pl-[80px] lg:pl-[80px];
+  }
+
+  @media (max-width: 768px) {
+    .pl-sidebar {
+      @apply pl-0 pt-16;
+    }
+  }
+}

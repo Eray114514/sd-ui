@@ -34,7 +34,7 @@ export function Sidebar() {
     ]
 
     return (
-        <aside className="fixed left-0 top-0 z-50 h-screen w-[80px] flex flex-col items-center bg-card border-r border-border py-6 transition-all">
+        <aside className="fixed left-0 top-0 z-50 h-screen w-[80px] flex flex-col items-center bg-card border-r border-border py-6 transition-all hidden lg:flex">
             {/* Logo */}
             <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-purple-600 shadow-lg shadow-primary/20 mb-2 cursor-pointer hover:scale-105 transition-transform duration-200">
                 <Palette className="w-[22px] h-[22px] text-white" />

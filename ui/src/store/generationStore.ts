@@ -9,6 +9,8 @@ export interface GenerationState extends GenerationParams {
   negative_prompt: string
   styles: string[]
   model: string
+  sampler: string
+  seed: number
   bottomSpacerHeight: number
 
   setPrompt: (p: string) => void
@@ -88,6 +90,7 @@ export const useGenerationStore = create<GenerationState>()(
         steps: state.steps,
         cfg: state.cfg,
         batchSize: state.batchSize,
+        seed: state.seed,
       }),
     }
   )

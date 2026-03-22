@@ -1,11 +1,13 @@
 import { prisma } from './db'
-import axios from 'axios'
+import axios, { AxiosError } from 'axios'
 import fs from 'fs'
 import path from 'path'
 import { getDefaultImageDir, normalizeImageDir } from "./paths"
 import { SD_WEBUI_BASE_URL } from './sdConfig'
 import http from 'http'
 import https from 'https'
+
+const MAX_RETRIES = 2
 
 const globalForQueue = globalThis as unknown as {
     isProcessing: boolean
@@ -146,23 +148,38 @@ export async function processQueue() {
 
                 console.log(`[Queue] 任务完成: ${task.id}`)
 
-            } catch (error: any) {
+            } catch (error: unknown) {
                 const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-                const status = error?.response?.status
-                const data = error?.response?.data
+                const axiosError = error as AxiosError
+                const status = axiosError.response?.status
+                const data = axiosError.response?.data
                 const url = `${SD_WEBUI_BASE_URL}/sdapi/v1/txt2img`
 
-                let errorMessage = error.message || "Unknown error"
+                const currentRetry = task.retryCount || 0
+
+                if (currentRetry < MAX_RETRIES) {
+                    console.log(`[Queue] 任务 ${task.id} 失败，正在进行第 ${currentRetry + 1}/${MAX_RETRIES} 次重试...`)
+                    await prisma.task.update({
+                        where: { id: task.id },
+                        data: {
+                            status: 'pending',
+                            retryCount: currentRetry + 1
+                        },
+                    })
+                    continue
+                }
+
+                let errorMessage = axiosError.message || "Unknown error"
 
                 if (status === 502) {
                     errorMessage = "SD WebUI 服务暂时不可用 (502)。可能原因：1) SD WebUI正在生成其他图片 2) 服务重启中 3) 网络连接中断。请稍后重试。"
                 } else if (status === 503) {
                     errorMessage = "SD WebUI 服务繁忙 (503)，请稍后重试。"
-                } else if (error.code === 'ECONNREFUSED') {
+                } else if (axiosError.code === 'ECONNREFUSED') {
                     errorMessage = "无法连接到 SD WebUI 服务，请检查服务是否已启动。"
-                } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+                } else if (axiosError.code === 'ETIMEDOUT' || axiosError.code === 'ECONNABORTED') {
                     errorMessage = "连接 SD WebUI 超时，可能是生成时间过长或服务无响应。"
-                } else if (error.code === 'ECONNRESET') {
+                } else if (axiosError.code === 'ECONNRESET') {
                     errorMessage = "连接被重置，可能是 SD WebUI 服务重启或网络不稳定。"
                 }
 
@@ -175,10 +192,10 @@ export async function processQueue() {
                         method: 'POST',
                     },
                     errorDetails: {
-                        code: error.code || 'N/A',
+                        code: axiosError.code || 'N/A',
                         status: status || 'N/A',
                         responseData: data || 'N/A',
-                        stack: error.stack || 'N/A'
+                        stack: axiosError.stack || 'N/A'
                     }
                 }
 
@@ -187,10 +204,10 @@ export async function processQueue() {
                 console.error(`[Queue] 任务失败: ${task.id}, 耗时: ${elapsed} 秒`, {
                     url,
                     status,
-                    code: error.code,
-                    message: error?.message,
+                    code: axiosError.code,
+                    message: axiosError.message,
                     data,
-                    stack: error.stack
+                    stack: axiosError.stack
                 })
 
                 await prisma.task.update({
