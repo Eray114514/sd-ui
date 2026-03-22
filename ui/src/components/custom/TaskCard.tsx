@@ -32,7 +32,7 @@ interface TaskCardProps {
   onTasksChange: () => void
 }
 
-export function TaskCard({ task, progressData, selectedImage, setSelectedImage, onDeleted, onTasksChange }: TaskCardProps) {
+export function TaskCard({ task, progressData, setSelectedImage, onDeleted, onTasksChange }: TaskCardProps) {
   const fillFromTask = useGenerationStore(state => state.fillFromTask)
   const [deleteTaskConfirmId, setDeleteTaskConfirmId] = useState<string | null>(null)
   const [deleteImageConfirmId, setDeleteImageConfirmId] = useState<string | null>(null)
@@ -48,17 +48,18 @@ export function TaskCard({ task, progressData, selectedImage, setSelectedImage, 
     }
   }, [onTasksChange])
 
-  const handleDeleteImage = useCallback(async (imageId: string, taskId: string) => {
+  const handleDeleteImage = useCallback(async (imageId: string) => {
     try {
       await deleteAsset(imageId)
       onDeleted(imageId)
+      onTasksChange()
       toast.success("图片已删除")
     } catch {
       toast.error("删除图片失败")
     }
-  }, [onDeleted])
+  }, [onDeleted, onTasksChange])
 
-  const handleFavoriteImage = useCallback(async (imageId: string, currentStatus: boolean, taskId: string) => {
+  const handleFavoriteImage = useCallback(async (imageId: string, currentStatus: boolean) => {
     try {
       const newStatus = !currentStatus
       await updateAsset(imageId, newStatus)

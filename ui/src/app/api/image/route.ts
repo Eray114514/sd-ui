@@ -35,8 +35,8 @@ export async function GET(req: Request) {
             } else {
                 return new NextResponse('Image not found', { status: 404 })
             }
-        } catch (e) {
-            console.error("Error resolving image path:", e)
+        } catch {
+            console.error("Error resolving image path")
             return new NextResponse('Internal Server Error', { status: 500 })
         }
     }
@@ -56,7 +56,7 @@ export async function GET(req: Request) {
                         data: { path: filePath }
                     })
                 }
-            }).catch((err: any) => console.error("Failed to update image path in DB:", err))
+            }).catch((err: unknown) => console.error("Failed to update image path in DB:", err))
         }
 
         return new NextResponse(file, {
@@ -66,7 +66,7 @@ export async function GET(req: Request) {
                 'Cache-Control': 'public, max-age=31536000, immutable'
             }
         })
-    } catch (e) {
+    } catch {
         return new NextResponse('Error reading file', { status: 500 })
     }
 }

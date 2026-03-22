@@ -34,7 +34,7 @@ export function TaskList() {
         bottomRef.current.scrollIntoView({ behavior: "smooth" })
       }
     }
-  }, [tasks.length, Object.keys(progressData).length])
+  }, [tasks.length])
 
   useEffect(() => {
     const handleVisibilityChange = () => {

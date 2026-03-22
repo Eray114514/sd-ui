@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,19 +22,23 @@ interface ImageDetailModalProps {
 }
 
 export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedImages }: ImageDetailModalProps) {
-  const [currentImage, setCurrentImage] = useState<ImageWithTask | null>(image)
+  const [currentImage, setCurrentImage] = useState<ImageWithTask | null>(null)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const fillFromTask = useGenerationStore(state => state.fillFromTask)
 
-  useEffect(() => {
+  const computedImage = useMemo(() => {
     if (image && !image.task) {
-        const found = relatedImages.find(img => img.id === image.id);
-        if (found && found.task) {
-            setCurrentImage(found);
-            return;
-        }
+      const found = relatedImages.find(img => img.id === image.id);
+      if (found && found.task) {
+        return found;
+      }
     }
-    setCurrentImage(image)
-  }, [image, relatedImages])
+    return image;
+  }, [image, relatedImages]);
+
+  useEffect(() => {
+    setCurrentImage(computedImage);
+  }, [computedImage]);
 
   if (!currentImage || !currentImage.task) return null
 
@@ -57,12 +61,10 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
       await axios.put('/api/assets', { id: currentImage.id, isFavorite: newStatus })
       setCurrentImage({ ...currentImage, isFavorite: newStatus })
       toast.success(newStatus ? "已添加到收藏" : "已从收藏移除")
-    } catch (e) {
+    } catch {
       toast.error("更新收藏状态失败")
     }
   }
-
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   const handleDelete = async () => {
     const imageIdToDelete = currentImage.id
@@ -113,7 +115,7 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
       await axios.post('/api/generate', payload)
       toast.success("重新生成任务已添加到队列")
       onClose()
-    } catch (e) {
+    } catch {
       toast.error("重新生成失败")
     }
   }

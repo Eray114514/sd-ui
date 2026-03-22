@@ -38,8 +38,9 @@ export async function POST(req: Request) {
     const style = await prisma.style.create({ data: { name } })
     apiCache.invalidate(cacheKeys.styles)
     return NextResponse.json(style)
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }
 
@@ -55,7 +56,8 @@ export async function DELETE(req: Request) {
     await prisma.style.delete({ where: { id } })
     apiCache.invalidate(cacheKeys.styles)
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }

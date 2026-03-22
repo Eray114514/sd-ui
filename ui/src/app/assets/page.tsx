@@ -161,7 +161,6 @@ export default function AssetsPage() {
     return groups
   }, [filteredImages])
 
-  const totalImageCount = filteredImages.length
   const lastGroupIndex = groupedImages.length - 1
 
   return (

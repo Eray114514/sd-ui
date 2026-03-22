@@ -41,17 +41,15 @@ export function DirectoryPicker({ startPath, onSelect, onClose }: DirectoryPicke
       setCurrent(res.data.current ?? null)
       setParent(res.data.parent ?? null)
       setEntries(res.data.entries ?? [])
-    } catch (e: any) {
-      setError(e?.response?.data?.error || "Failed to load directory list.")
+    } catch {
+      setError("Failed to load directory list.")
       if (target) {
-        // Fallback to root listing if the requested path is invalid.
         try {
           const res = await axios.get<FsResponse>("/api/fs")
           setCurrent(res.data.current ?? null)
           setParent(res.data.parent ?? null)
           setEntries(res.data.entries ?? [])
         } catch {
-          // Ignore secondary failures.
         }
       }
     } finally {

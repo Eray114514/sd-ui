@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,7 +20,7 @@ export function SettingsDialog() {
     const [open, setOpen] = useState(false)
     const [showDirPicker, setShowDirPicker] = useState(false)
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
             const [settingsRes, modelsRes, stylesRes] = await Promise.all([
                 axios.get('/api/settings'),
@@ -31,45 +31,42 @@ export function SettingsDialog() {
             setModels(modelsRes.data || [])
             setStyles(stylesRes.data || [])
 
-            // Ensure default model exists
             const defaultModel = "waiillustriousSDXL_v160.safetensors"
-            const hasDefault = modelsRes.data?.some((m: any) => m.name === defaultModel)
+            const hasDefault = modelsRes.data?.some((m: { name: string }) => m.name === defaultModel)
             if (!hasDefault && modelsRes.data) {
-                // Auto-add default model if missing
                 try {
                     await axios.post('/api/models', { name: defaultModel })
-                    // Don't modify state directly here to avoid potential race/dup, let next fetch handle it or simple optimistic
-                } catch (e) { console.error("Auto-add default model failed") }
+                } catch { console.error("Auto-add default model failed") }
             }
-            // Ensure default styles exist
             const defaultStyles = ["Lasy", "NAI3起手-"]
             for (const style of defaultStyles) {
-                const hasStyle = stylesRes.data?.some((s: any) => s.name === style)
+                const hasStyle = stylesRes.data?.some((s: { name: string }) => s.name === style)
                 if (!hasStyle) {
                     try {
                         await axios.post('/api/styles', { name: style })
                         setStyles(prev => [...prev, { id: 'temp-' + style, name: style }])
-                    } catch (e) { console.error(`Auto-add style ${style} failed`) }
+                    } catch { console.error(`Auto-add style ${style} failed`) }
                 }
             }
-        } catch (e) {
-            console.error("Failed to load settings", e)
+        } catch {
+            console.error("Failed to load settings")
         }
-    }
+    }, [])
 
     useEffect(() => {
         if (open) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             fetchData()
         } else {
             setShowDirPicker(false)
         }
-    }, [open])
+    }, [open, fetchData])
 
     const saveSettings = async () => {
         try {
             await axios.post('/api/settings', { imageDir })
             toast.success("设置已保存")
-        } catch (e) {
+        } catch {
             toast.error("保存设置失败")
         }
     }
@@ -81,7 +78,7 @@ export function SettingsDialog() {
             setNewModel("")
             fetchData()
             toast.success("模型已添加")
-        } catch (e) {
+        } catch {
             toast.error("添加模型失败")
         }
     }
@@ -91,7 +88,7 @@ export function SettingsDialog() {
             await axios.delete('/api/models', { data: { id } })
             fetchData()
             toast.success("模型已删除")
-        } catch (e) {
+        } catch {
             toast.error("删除模型失败")
         }
     }
@@ -103,7 +100,7 @@ export function SettingsDialog() {
             setNewStyle("")
             fetchData()
             toast.success("风格已添加")
-        } catch (e) {
+        } catch {
             toast.error("添加风格失败")
         }
     }
@@ -113,7 +110,7 @@ export function SettingsDialog() {
             await axios.delete('/api/styles', { data: { id } })
             fetchData()
             toast.success("风格已删除")
-        } catch (e) {
+        } catch {
             toast.error("删除风格失败")
         }
     }
