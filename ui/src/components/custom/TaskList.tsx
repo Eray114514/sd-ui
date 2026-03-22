@@ -38,13 +38,16 @@ export function TaskList() {
   }, [updateProgressSnapshot])
 
   useEffect(() => {
-    if (bottomRef.current) {
-      if (initialLoadRef.current && tasks.length > 0) {
-        bottomRef.current.scrollIntoView({ behavior: "auto" })
-        initialLoadRef.current = false
-      } else if (!initialLoadRef.current && tasks.length > 0) {
-        bottomRef.current.scrollIntoView({ behavior: "smooth" })
+    if (bottomRef.current && tasks.length > 0) {
+      const scrollOptions: ScrollIntoViewOptions = initialLoadRef.current
+        ? { behavior: "instant", block: "end" }
+        : { behavior: "smooth", block: "end" }
+
+      if ('scrollIntoView' in bottomRef.current) {
+        bottomRef.current.scrollIntoView(scrollOptions)
       }
+
+      initialLoadRef.current = false
     }
   }, [tasks.length])
 
