@@ -38,6 +38,13 @@ export const UI_CONSTANTS = {
     TASKS_INTERVAL: 3000,
     PROGRESS_INTERVAL: 1000,
   },
+  CACHE: {
+    MODELS_TTL: 5 * 60 * 1000,
+    STYLES_TTL: 5 * 60 * 1000,
+  },
+  PROGRESS: {
+    RAF_THROTTLE: 100,
+  },
 } as const
 
 export const SLIDER_CONSTRAINTS = {

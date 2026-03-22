@@ -18,7 +18,7 @@ import { toast } from "sonner"
 import { useGenerationStore } from "@/store/generationStore"
 import { parseError } from "@/errors/errorHandler"
 import type { Task, GeneratedImage, ProgressData, ParsedErrorDetails, ImageWithTask } from "@/types"
-import { useState, useCallback } from "react"
+import { useState, useCallback, memo } from "react"
 import { deleteAsset, updateAsset, getAssetDownloadUrl } from "@/services/assetsService"
 import { deleteTask } from "@/services/tasksService"
 import { generate } from "@/services/generateService"
@@ -32,7 +32,7 @@ interface TaskCardProps {
   onTasksChange: () => void
 }
 
-export function TaskCard({ task, progressData, setSelectedImage, onDeleted, onTasksChange }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task, progressData, setSelectedImage, onDeleted, onTasksChange }: TaskCardProps) {
   const fillFromTask = useGenerationStore(state => state.fillFromTask)
   const [deleteTaskConfirmId, setDeleteTaskConfirmId] = useState<string | null>(null)
   const [deleteImageConfirmId, setDeleteImageConfirmId] = useState<string | null>(null)
@@ -219,7 +219,7 @@ export function TaskCard({ task, progressData, setSelectedImage, onDeleted, onTa
                     variant="secondary"
                     size="icon"
                     className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/40 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95"
-                    onClick={() => handleFavoriteImage(img.id, img.isFavorite, task.id)}
+                    onClick={() => handleFavoriteImage(img.id, img.isFavorite)}
                   >
                     <StarIcon className={`w-3.5 h-3.5 ${img.isFavorite ? "fill-yellow-400 text-yellow-400" : ""}`} />
                   </Button>
@@ -249,7 +249,7 @@ export function TaskCard({ task, progressData, setSelectedImage, onDeleted, onTa
                         </div>
                         <div className="flex justify-end gap-2 mt-2">
                           <Button variant="outline" size="sm" className="h-8 rounded-full px-4 text-xs font-medium" onClick={() => setDeleteImageConfirmId(null)}>取消</Button>
-                          <Button variant="default" size="sm" className="h-8 rounded-full px-4 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium" onClick={() => { setDeleteImageConfirmId(null); handleDeleteImage(img.id, task.id); }}>确定删除</Button>
+                          <Button variant="default" size="sm" className="h-8 rounded-full px-4 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium" onClick={() => { setDeleteImageConfirmId(null); handleDeleteImage(img.id); }}>确定删除</Button>
                         </div>
                       </div>
                     </PopoverContent>
@@ -315,7 +315,7 @@ export function TaskCard({ task, progressData, setSelectedImage, onDeleted, onTa
       <div className="h-px bg-border/40 w-full my-4" />
     </div>
   )
-}
+})
 
 interface ErrorDisplayProps {
   error: string
@@ -325,7 +325,7 @@ interface ErrorDisplayProps {
   copyErrorDetails: (errorDetails: ParsedErrorDetails) => void
 }
 
-function ErrorDisplay({ error, taskId, expandedErrors, toggleError, copyErrorDetails }: ErrorDisplayProps) {
+const ErrorDisplay = memo(function ErrorDisplay({ error, taskId, expandedErrors, toggleError, copyErrorDetails }: ErrorDisplayProps) {
   const parsedError = parseError(error)
 
   if (parsedError) {
@@ -422,20 +422,22 @@ function ErrorDisplay({ error, taskId, expandedErrors, toggleError, copyErrorDet
       </div>
     )
   }
-}
+})
 
-function ChevronUpIcon({ className }: { className?: string }) {
+const ChevronUpIcon = memo(function ChevronUpIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="m18 15-6-6-6 6"/>
     </svg>
   )
-}
+})
+ChevronUpIcon.displayName = 'ChevronUpIcon'
 
-function ChevronDownIcon({ className }: { className?: string }) {
+const ChevronDownIcon = memo(function ChevronDownIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="m6 9 6 6 6-6"/>
     </svg>
   )
-}
+})
+ChevronDownIcon.displayName = 'ChevronDownIcon'

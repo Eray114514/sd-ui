@@ -5,6 +5,7 @@ import { useGenerationStore } from "@/store/generationStore"
 import { getTasks } from "@/services/tasksService"
 import { getProgress } from "@/services/progressService"
 import { UI_CONSTANTS } from "@/constants"
+import { tasksPollingManager, progressPollingManager } from "@/lib/pollingManager"
 import type { Task, ProgressData, ImageWithTask } from "@/types"
 import { TaskCard } from "@/components/custom/TaskCard"
 import { ImageDetailModal } from "@/components/custom/ImageDetailModal"
@@ -12,81 +13,40 @@ import { ImageDetailModal } from "@/components/custom/ImageDetailModal"
 export function TaskList() {
   const [tasks, setTasks] = useState<Task[]>([])
   const bottomSpacerHeight = useGenerationStore(state => state.bottomSpacerHeight)
-  const [progressData, setProgressData] = useState<Record<string, ProgressData>>({})
   const [selectedImage, setSelectedImage] = useState<ImageWithTask | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const initialLoadRef = useRef(true)
-  const tasksRef = useRef<Task[]>([])
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const fetchIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const isPageVisibleRef = useRef(true)
+  const progressDataRef = useRef<Record<string, ProgressData>>({})
+  const [progressDataSnapshot, setProgressDataSnapshot] = useState<Record<string, ProgressData>>({})
+  const rafIdRef = useRef<number | null>(null)
+  const lastUpdateRef = useRef<number>(0)
 
-  useEffect(() => {
-    tasksRef.current = tasks
-  }, [tasks])
+  const updateProgressSnapshot = useCallback(() => {
+    const now = Date.now()
+    if (now - lastUpdateRef.current >= UI_CONSTANTS.PROGRESS.RAF_THROTTLE) {
+      lastUpdateRef.current = now
+      setProgressDataSnapshot({ ...progressDataRef.current })
+    }
+  }, [])
+
+  const scheduleProgressUpdate = useCallback(() => {
+    if (rafIdRef.current !== null) return
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null
+      updateProgressSnapshot()
+    })
+  }, [updateProgressSnapshot])
 
   useEffect(() => {
     if (bottomRef.current) {
       if (initialLoadRef.current && tasks.length > 0) {
         bottomRef.current.scrollIntoView({ behavior: "auto" })
         initialLoadRef.current = false
-      } else if (!initialLoadRef.current) {
+      } else if (!initialLoadRef.current && tasks.length > 0) {
         bottomRef.current.scrollIntoView({ behavior: "smooth" })
       }
     }
   }, [tasks.length])
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      isPageVisibleRef.current = !document.hidden
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [])
-
-  useEffect(() => {
-    const fetchProgress = async () => {
-      if (!isPageVisibleRef.current) return
-      try {
-        const data = await getProgress(false)
-        if (data) {
-          const currentTasks = tasksRef.current
-          const updated: Record<string, ProgressData> = {}
-          const processingTasks = currentTasks.filter((t: Task) => t.status === 'processing')
-          for (const task of processingTasks) {
-            updated[task.id] = {
-              progress: data.progress || 0,
-              current_image: data.current_image || null
-            }
-          }
-          if (Object.keys(updated).length > 0) {
-            setProgressData(prev => ({ ...prev, ...updated }))
-          }
-        }
-      } catch {
-        // ignore errors during polling
-      }
-    }
-
-    const hasProcessing = tasksRef.current.some((t: Task) => t.status === 'processing')
-    if (hasProcessing && !progressIntervalRef.current) {
-      fetchProgress()
-      progressIntervalRef.current = setInterval(fetchProgress, UI_CONSTANTS.POLLING.PROGRESS_INTERVAL)
-    } else if (!hasProcessing && progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current)
-      progressIntervalRef.current = null
-    }
-
-    return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current)
-        progressIntervalRef.current = null
-      }
-    }
-  }, [tasks])
 
   const handleTasksChange = useCallback(() => {
     getTasks().then(setTasks).catch(console.error)
@@ -117,7 +77,6 @@ export function TaskList() {
 
   useEffect(() => {
     const fetchTasks = async () => {
-      if (!isPageVisibleRef.current) return
       try {
         const data = await getTasks()
         setTasks(data)
@@ -131,17 +90,55 @@ export function TaskList() {
     }
 
     fetchTasks()
-    fetchIntervalRef.current = setInterval(fetchTasks, UI_CONSTANTS.POLLING.TASKS_INTERVAL)
+
+    tasksPollingManager.start(handleTaskCreated)
     window.addEventListener('task-created', handleTaskCreated)
 
     return () => {
-      if (fetchIntervalRef.current) {
-        clearInterval(fetchIntervalRef.current)
-        fetchIntervalRef.current = null
-      }
+      tasksPollingManager.stop()
       window.removeEventListener('task-created', handleTaskCreated)
     }
   }, [])
+
+  useEffect(() => {
+    const fetchProgress = async () => {
+      const hasProcessing = tasks.some((t: Task) => t.status === 'processing')
+      if (!hasProcessing) {
+        progressPollingManager.stop()
+        return
+      }
+
+      try {
+        const data = await getProgress(false)
+        if (data) {
+          const updated: Record<string, ProgressData> = {}
+          const processingTasks = tasks.filter((t: Task) => t.status === 'processing')
+          for (const task of processingTasks) {
+            updated[task.id] = {
+              progress: data.progress || 0,
+              current_image: data.current_image || null
+            }
+          }
+          if (Object.keys(updated).length > 0) {
+            Object.assign(progressDataRef.current, updated)
+            scheduleProgressUpdate()
+          }
+        }
+      } catch {
+        // ignore errors during polling
+      }
+    }
+
+    progressPollingManager.start(fetchProgress)
+
+    return () => {
+      progressPollingManager.stop()
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current)
+        rafIdRef.current = null
+      }
+    }
+  }, [tasks, scheduleProgressUpdate])
 
   return (
     <div className="p-4 md:p-8 w-full max-w-4xl mx-auto flex flex-col gap-8 pb-[20px]">
@@ -161,7 +158,7 @@ export function TaskList() {
           <TaskCard
             key={task.id}
             task={task}
-            progressData={progressData[task.id]}
+            progressData={progressDataSnapshot[task.id]}
             selectedImage={selectedImage}
             setSelectedImage={setSelectedImage}
             onDeleted={handleDeleted}
