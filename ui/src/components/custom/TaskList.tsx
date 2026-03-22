@@ -86,7 +86,7 @@ export function TaskList() {
         progressIntervalRef.current = null
       }
     }
-  }, [])
+  }, [tasks])
 
   const handleTasksChange = useCallback(() => {
     getTasks().then(setTasks).catch(console.error)
