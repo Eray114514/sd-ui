@@ -65,14 +65,11 @@ export function TaskList() {
 
     setSelectedImage((prev: ImageWithTask | null) => {
       if (prev && prev.id === id) {
-        const taskImages = prev.task?.images || []
-        const currentIndex = taskImages.findIndex((img) => img.id === id)
-        const newImages = taskImages.filter((img) => img.id !== id)
-        if (newImages.length > 0) {
-          const nextIndex = currentIndex >= newImages.length ? newImages.length - 1 : currentIndex
-          return { ...newImages[nextIndex], task: { ...prev.task, images: newImages } }
-        }
         return null
+      }
+      if (prev && prev.task?.images) {
+        const newImages = prev.task.images.filter((img) => img.id !== id)
+        return { ...prev, task: { ...prev.task, images: newImages } }
       }
       return prev
     })

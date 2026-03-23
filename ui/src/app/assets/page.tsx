@@ -85,16 +85,10 @@ export default function AssetsPage() {
       const remainingImages = prev.filter(img => img.id !== id)
 
       if (taskId && selectedImage?.id === id) {
-        const taskImages = prev.filter(img => img.taskId === taskId)
-        const currentIndex = taskImages.findIndex(img => img.id === id)
-        const newImages = remainingImages.filter(img => img.taskId === taskId)
-        if (newImages.length > 0) {
-          const nextIndex = currentIndex >= newImages.length ? newImages.length - 1 : currentIndex
-          const task = remainingImages.find(img => img.id === newImages[nextIndex].id)?.task || selectedImage.task
-          setSelectedImage({ ...newImages[nextIndex], task })
-        } else {
-          setSelectedImage(null)
-        }
+        setSelectedImage(null)
+      } else if (selectedImage?.task?.images) {
+        const newTaskImages = selectedImage.task.images.filter(img => img.id !== id)
+        setSelectedImage(prev => prev ? { ...prev, task: { ...prev.task, images: newTaskImages } } : null)
       }
 
       return remainingImages

@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useRef, useCallback } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { DownloadIcon, StarIcon, TrashIcon, RefreshCwIcon, EditIcon, AlertCircle } from "lucide-react"
+import { DownloadIcon, StarIcon, TrashIcon, RefreshCwIcon, EditIcon, AlertCircle, Loader2 } from "lucide-react"
 import { useGenerationStore } from "@/store/generationStore"
 import axios from "axios"
 import { toast } from "sonner"
@@ -24,7 +24,11 @@ interface ImageDetailModalProps {
 export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedImages }: ImageDetailModalProps) {
   const [currentImage, setCurrentImage] = useState<ImageWithTask | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isFavoriteLoading, setIsFavoriteLoading] = useState(false)
   const fillFromTask = useGenerationStore(state => state.fillFromTask)
+  const isDeletingRef = useRef(false)
+  const deletedIdRef = useRef<string | null>(null)
 
   const computedImage = useMemo(() => {
     if (image && !image.task) {
@@ -37,65 +41,94 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
   }, [image, relatedImages]);
 
   useEffect(() => {
+    if (isDeletingRef.current && deletedIdRef.current) {
+      return
+    }
     setCurrentImage(computedImage);
   }, [computedImage]);
 
-  if (!currentImage || !currentImage.task) return null
+  useEffect(() => {
+    if (!isOpen) {
+      isDeletingRef.current = false
+      deletedIdRef.current = null
+      setIsDeleting(false)
+      setIsFavoriteLoading(false)
+    }
+  }, [isOpen])
 
-  const getBasename = (p: string) => {
+  const getBasename = useCallback((p: string) => {
     const normalized = p.replace(/\\/g, "/")
     const parts = normalized.split("/")
     return parts[parts.length - 1] || "image.png"
-  }
+  }, [])
 
-  const handleDownload = () => {
+  const handleDownload = useCallback(() => {
+    if (!currentImage) return
     const link = document.createElement("a")
     link.href = `/api/image?path=${encodeURIComponent(currentImage.path)}`
     link.download = getBasename(currentImage.path)
     link.click()
-  }
+  }, [currentImage, getBasename])
 
-  const handleFavorite = async () => {
+  const handleFavorite = useCallback(async () => {
+    if (!currentImage || isFavoriteLoading) return
+    setIsFavoriteLoading(true)
     try {
       const newStatus = !currentImage.isFavorite
       await axios.put('/api/assets', { id: currentImage.id, isFavorite: newStatus })
-      setCurrentImage({ ...currentImage, isFavorite: newStatus })
+      setCurrentImage(prev => prev ? { ...prev, isFavorite: newStatus } : null)
       toast.success(newStatus ? "已添加到收藏" : "已从收藏移除")
     } catch {
       toast.error("更新收藏状态失败")
+    } finally {
+      setIsFavoriteLoading(false)
     }
-  }
+  }, [currentImage, isFavoriteLoading])
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
+    if (!currentImage || isDeleting) return
     const imageIdToDelete = currentImage.id
+    isDeletingRef.current = true
+    deletedIdRef.current = imageIdToDelete
+    setIsDeleting(true)
+    
     try {
       await axios.delete('/api/assets', { data: { id: imageIdToDelete } })
       toast.success("图片已删除")
 
       const currentIndex = relatedImages.findIndex(img => img.id === imageIdToDelete)
       const remainingImages = relatedImages.filter(img => img.id !== imageIdToDelete)
+      
+      onDeleted(imageIdToDelete)
+      
       if (remainingImages.length > 0) {
         const nextIndex = currentIndex >= remainingImages.length ? remainingImages.length - 1 : currentIndex
         const nextImage = remainingImages[nextIndex]
-        onDeleted(imageIdToDelete)
         setCurrentImage({ ...nextImage, task: nextImage.task || currentImage.task })
+        isDeletingRef.current = false
+        deletedIdRef.current = null
       } else {
-        onDeleted(imageIdToDelete)
         onClose()
       }
       setIsDeleteDialogOpen(false)
-    } catch (e) {
+    } catch {
       toast.error("删除图片失败")
+      isDeletingRef.current = false
+      deletedIdRef.current = null
+    } finally {
+      setIsDeleting(false)
     }
-  }
+  }, [currentImage, relatedImages, onDeleted, onClose, isDeleting])
 
-  const handleReEdit = () => {
+  const handleReEdit = useCallback(() => {
+    if (!currentImage?.task) return
     fillFromTask(currentImage.task)
     toast.success("参数已加载到控制面板")
     onClose()
-  }
+  }, [currentImage, fillFromTask, onClose])
 
-  const handleRegenerate = async () => {
+  const handleRegenerate = useCallback(async () => {
+    if (!currentImage?.task) return
     try {
       const task = currentImage.task
       const payload = {
@@ -118,7 +151,9 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
     } catch {
       toast.error("重新生成失败")
     }
-  }
+  }, [currentImage, onClose])
+
+  if (!currentImage || !currentImage.task) return null
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -144,19 +179,20 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
               <Button variant="ghost" size="icon" className="hover:bg-muted rounded-full" onClick={handleDownload} title="下载原图">
                 <DownloadIcon className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="hover:bg-muted rounded-full" onClick={handleFavorite} title={currentImage.isFavorite ? "取消收藏" : "收藏"}>
-                <StarIcon className={`w-4 h-4 ${currentImage.isFavorite ? "fill-yellow-500 text-yellow-500" : ""}`} />
+              <Button variant="ghost" size="icon" className="hover:bg-muted rounded-full" onClick={handleFavorite} disabled={isFavoriteLoading} title={currentImage.isFavorite ? "取消收藏" : "收藏"}>
+                {isFavoriteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <StarIcon className={`w-4 h-4 ${currentImage.isFavorite ? "fill-yellow-500 text-yellow-500" : ""}`} />}
               </Button>
               <Popover open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <PopoverTrigger
                   render={
                     <button
                       type="button"
-                      className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
                       title="删除图片"
                       onClick={() => setIsDeleteDialogOpen(true)}
+                      disabled={isDeleting}
                     >
-                      <TrashIcon className="w-4 h-4" />
+                      {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrashIcon className="w-4 h-4" />}
                     </button>
                   }
                 />
@@ -172,8 +208,11 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
                       </div>
                     </div>
                     <div className="flex justify-end gap-2 mt-2">
-                      <Button variant="outline" size="sm" className="h-8 rounded-full px-4 text-xs font-medium" onClick={() => setIsDeleteDialogOpen(false)}>取消</Button>
-                      <Button variant="default" size="sm" className="h-8 rounded-full px-4 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium" onClick={handleDelete}>确定删除</Button>
+                      <Button variant="outline" size="sm" className="h-8 rounded-full px-4 text-xs font-medium" onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeleting}>取消</Button>
+                      <Button variant="default" size="sm" className="h-8 rounded-full px-4 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium" onClick={handleDelete} disabled={isDeleting}>
+                        {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                        确定删除
+                      </Button>
                     </div>
                   </div>
                 </PopoverContent>
