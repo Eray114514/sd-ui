@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
 import { ASSETS_PAGE_SIZE } from "@/lib/constants"
 import type { ImageWithTask } from "@/types"
 
@@ -160,17 +159,8 @@ export default function AssetsPage() {
   return (
     <div className="min-h-screen bg-background p-6 md:p-8 pb-[400px]">
 
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex flex-col md:flex-row justify-between items-end gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-500">
-              创意画廊
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              管理和浏览您的所有 AI 生成作品
-            </p>
-          </div>
-
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col md:flex-row gap-4 sticky top-0 z-30 bg-background/80 backdrop-blur-md py-4 -mx-2 px-2 border-b border-border/50 transition-all">
           <div className="flex items-center gap-2 w-full md:w-auto bg-muted/30 p-1 rounded-xl border border-border/50">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
               <TabsList className="bg-transparent">
@@ -179,10 +169,8 @@ export default function AssetsPage() {
               </TabsList>
             </Tabs>
           </div>
-        </div>
-
-        <div className="flex flex-col md:flex-row gap-4 sticky top-0 z-30 bg-background/80 backdrop-blur-md py-4 -mx-2 px-2 border-b border-border/50 transition-all">
-          <div className="relative flex-1 max-w-md">
+          
+          <div className="relative flex-1 max-w-md ml-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -235,8 +223,8 @@ export default function AssetsPage() {
                         loading="lazy"
                       />
 
-                      <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-3 z-10">
-                        <div className="flex justify-end gap-2 transition-opacity transform -translate-y-2 group-hover:translate-y-0 duration-200">
+                      <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-3 z-10 pointer-events-none">
+                        <div className="flex justify-end gap-2 pointer-events-auto">
                           <Button
                             variant="secondary"
                             size="icon"
@@ -259,13 +247,13 @@ export default function AssetsPage() {
                                 <button
                                   type="button"
                                   className="h-9 w-9 rounded-full bg-black/40 hover:bg-red-500/80 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95 flex items-center justify-center"
-                                  onClick={() => setDeleteImageConfirmId(img.id)}
+                                  onClick={(e) => { e.stopPropagation(); setDeleteImageConfirmId(img.id); }}
                                 >
                                   <TrashIcon className="w-4 h-4" />
                                 </button>
                               }
                             />
-                            <PopoverContent className="w-64 p-4 rounded-2xl shadow-xl border-border/50" align="end" side="top" sideOffset={8}>
+                            <PopoverContent className="w-64 p-4 rounded-2xl shadow-xl border-border/50" align="end" side="top" sideOffset={8} onClick={(e) => e.stopPropagation()}>
                               <div className="flex flex-col gap-3">
                                 <div className="flex items-start gap-3">
                                   <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-500/20 flex items-center justify-center shrink-0">
@@ -277,8 +265,8 @@ export default function AssetsPage() {
                                   </div>
                                 </div>
                                 <div className="flex justify-end gap-2 mt-2">
-                                  <Button variant="outline" size="sm" className="h-8 rounded-full px-4 text-xs font-medium" onClick={() => setDeleteImageConfirmId(null)}>取消</Button>
-                                  <Button variant="default" size="sm" className="h-8 rounded-full px-4 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium" onClick={() => { setDeleteImageConfirmId(null); handleDeleteImage(img.id); }}>确定删除</Button>
+                                  <Button variant="outline" size="sm" className="h-8 rounded-full px-4 text-xs font-medium" onClick={(e) => { e.stopPropagation(); setDeleteImageConfirmId(null); }}>取消</Button>
+                                  <Button variant="default" size="sm" className="h-8 rounded-full px-4 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium" onClick={(e) => { e.stopPropagation(); setDeleteImageConfirmId(null); handleDeleteImage(img.id); }}>确定删除</Button>
                                 </div>
                               </div>
                             </PopoverContent>
@@ -286,9 +274,8 @@ export default function AssetsPage() {
                         </div>
                       </div>
 
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-4 z-10">
-
-                        <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-4 z-10 pointer-events-none">
+                        <div>
                           <p className="text-white text-xs line-clamp-2 font-medium mb-2 opacity-90">
                             {img.task.prompt}
                           </p>

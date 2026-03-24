@@ -7,9 +7,9 @@ import {
     Bell,
     MessageSquare,
     Package,
-    Palette
+    Palette,
+    Settings2
 } from "lucide-react"
-import { SettingsDialog } from "@/components/custom/SettingsDialog"
 
 export function Sidebar() {
     const pathname = usePathname()
@@ -72,8 +72,15 @@ export function Sidebar() {
                     <Bell className="w-[22px] h-[22px]" />
                 </div>
 
-                {/* Settings / Menu */}
-                <SettingsDialog />
+                {/* Settings */}
+                <Link href="/settings">
+                    <div className={cn(
+                        "cursor-pointer p-2 rounded-xl transition-colors",
+                        pathname === "/settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                    )} title="系统设置">
+                        <Settings2 className="w-6 h-6" />
+                    </div>
+                </Link>
             </div>
         </aside>
     )

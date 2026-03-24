@@ -205,8 +205,8 @@ export const TaskCard = memo(function TaskCard({ task, progressData, setSelected
                 loading="lazy"
                 decoding="async"
               />
-              <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-2 z-10">
-                <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+              <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-2 z-10 pointer-events-none">
+                <div className="flex justify-end gap-1.5 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                   <Button
                     variant="secondary"
                     size="icon"
@@ -230,13 +230,13 @@ export const TaskCard = memo(function TaskCard({ task, progressData, setSelected
                           type="button"
                           className="h-8 w-8 rounded-full bg-white/20 hover:bg-red-500/80 text-white border-0 backdrop-blur-md hover:scale-110 transition-all duration-150 active:scale-95 flex items-center justify-center"
                           title="删除图片"
-                          onClick={() => setDeleteImageConfirmId(img.id)}
+                          onClick={(e) => { e.stopPropagation(); setDeleteImageConfirmId(img.id); }}
                         >
                           <TrashIcon className="w-3.5 h-3.5" />
                         </button>
                       }
                     />
-                    <PopoverContent className="w-64 p-4 rounded-2xl shadow-xl border-border/50" align="end" side="top" sideOffset={8}>
+                    <PopoverContent className="w-64 p-4 rounded-2xl shadow-xl border-border/50" align="end" side="top" sideOffset={8} onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-col gap-3">
                         <div className="flex items-start gap-3">
                           <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-500/20 flex items-center justify-center shrink-0">
@@ -248,8 +248,8 @@ export const TaskCard = memo(function TaskCard({ task, progressData, setSelected
                           </div>
                         </div>
                         <div className="flex justify-end gap-2 mt-2">
-                          <Button variant="outline" size="sm" className="h-8 rounded-full px-4 text-xs font-medium" onClick={() => setDeleteImageConfirmId(null)}>取消</Button>
-                          <Button variant="default" size="sm" className="h-8 rounded-full px-4 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium" onClick={() => { setDeleteImageConfirmId(null); handleDeleteImage(img.id); }}>确定删除</Button>
+                          <Button variant="outline" size="sm" className="h-8 rounded-full px-4 text-xs font-medium" onClick={(e) => { e.stopPropagation(); setDeleteImageConfirmId(null); }}>取消</Button>
+                          <Button variant="default" size="sm" className="h-8 rounded-full px-4 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium" onClick={(e) => { e.stopPropagation(); setDeleteImageConfirmId(null); handleDeleteImage(img.id); }}>确定删除</Button>
                         </div>
                       </div>
                     </PopoverContent>

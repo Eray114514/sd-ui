@@ -141,32 +141,34 @@ export function TaskList() {
   }, [tasks, scheduleProgressUpdate])
 
   return (
-    <div className="p-4 md:p-8 w-full max-w-4xl mx-auto flex flex-col gap-8 pb-[20px]">
-      {tasks.length === 0 && <p className="text-muted-foreground text-center mt-20">暂无生成记录，开始你的创作吧</p>}
+    <div className="w-full px-4 pt-6 pb-[20px] flex flex-col items-center">
+      <div className="w-full max-w-5xl flex flex-col gap-8">
+        {tasks.length === 0 && <p className="text-muted-foreground text-center mt-20">暂无生成记录，开始你的创作吧</p>}
 
-      {selectedImage && (
-        <ImageDetailModal
-          image={selectedImage}
-          isOpen={!!selectedImage}
-          onClose={() => setSelectedImage(null)}
-          onDeleted={handleDeleted}
-          relatedImages={(selectedImage.task?.images || []) as ImageWithTask[]}
-        />
-      )}
-      <div className="flex flex-col gap-10">
-        {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            progressData={progressDataSnapshot[task.id]}
-            selectedImage={selectedImage}
-            setSelectedImage={setSelectedImage}
+        {selectedImage && (
+          <ImageDetailModal
+            image={selectedImage}
+            isOpen={!!selectedImage}
+            onClose={() => setSelectedImage(null)}
             onDeleted={handleDeleted}
-            onTasksChange={handleTasksChange}
+            relatedImages={(selectedImage.task?.images || []) as ImageWithTask[]}
           />
-        ))}
-        <div ref={bottomRef} />
-        <div id="bottom-spacer" style={{ height: `${bottomSpacerHeight}px` }} />
+        )}
+        <div className="flex flex-col gap-10">
+          {tasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              progressData={progressDataSnapshot[task.id]}
+              selectedImage={selectedImage}
+              setSelectedImage={setSelectedImage}
+              onDeleted={handleDeleted}
+              onTasksChange={handleTasksChange}
+            />
+          ))}
+          <div ref={bottomRef} />
+          <div id="bottom-spacer" style={{ height: `${bottomSpacerHeight}px` }} />
+        </div>
       </div>
     </div>
   )
