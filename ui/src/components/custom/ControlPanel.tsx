@@ -193,14 +193,14 @@ export function ControlPanel() {
           )}
 
         <div className={cn(
-          "bg-card/90 backdrop-blur-xl border border-border/60 rounded-2xl shadow-xl shadow-black/5 dark:shadow-none p-1 overflow-hidden relative w-full",
-          !isExpanded && "rounded-full max-w-[600px] flex items-center pr-1"
+          "bg-card/90 backdrop-blur-xl border border-border/60 shadow-xl shadow-black/5 dark:shadow-none relative w-full mx-auto transition-all ease-in-out",
+          isExpanded ? "max-w-4xl rounded-[32px] p-3" : "max-w-[600px] rounded-[32px] p-2"
         )}
         style={{
-          transition: `all ${UI_CONSTANTS.CONTROL_PANEL.TRANSITION_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          transitionDuration: `${UI_CONSTANTS.CONTROL_PANEL.TRANSITION_DURATION}ms`,
         }}>
 
-          <div className="relative group flex items-center flex-1 w-full">
+          <div className="relative group flex items-center w-full">
             <Textarea
               value={prompt}
               onChange={handleTextareaInput}
@@ -208,65 +208,62 @@ export function ControlPanel() {
               onFocus={() => setIsExpanded(true)}
               placeholder={isExpanded ? "描述你想象中的画面... (例如: 赛博朋克风格的雨夜街道，霓虹灯光)" : "请输入你的创意 (按 Enter 发送，Shift+Enter 换行)"}
               className={cn(
-                "border-none focus-visible:ring-0 resize-none bg-transparent text-sm p-4 placeholder:text-muted-foreground/60",
-                isExpanded ? "pr-32" : "h-[48px] min-h-[48px] py-3 px-4 overflow-hidden whitespace-nowrap cursor-pointer flex-1 w-full"
+                "border-none focus-visible:ring-0 resize-none bg-transparent text-sm placeholder:text-muted-foreground/60 w-full transition-all",
+                isExpanded ? "py-3 px-4 pb-4" : "h-[48px] min-h-[48px] py-3 px-4 pr-14 overflow-hidden whitespace-nowrap cursor-pointer"
               )}
               style={isExpanded ? { height: textareaHeight + 'px', minHeight: '48px', maxHeight: '300px' } : undefined}
               onClick={() => !isExpanded && setIsExpanded(true)}
               ref={textareaRef}
             />
 
-            {!isExpanded && (
-              <div className="pr-1 pl-1 shrink-0 flex items-center h-full">
-                <Button
-                  size="icon"
-                  className={cn(
-                    "h-9 w-9 rounded-full transition-all z-10",
-                    prompt.trim() ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-muted text-muted-foreground hover:bg-muted/80",
-                    isGenerating && "bg-muted text-muted-foreground cursor-not-allowed"
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleGenerate()
-                  }}
-                  disabled={isGenerating || !prompt.trim()}
-                >
-                  {isGenerating ? (
-                    <Sparkles className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
-            )}
+            <div className={cn(
+              "absolute right-1 transition-all duration-300 flex items-center justify-center",
+              isExpanded ? "opacity-0 pointer-events-none scale-90" : "opacity-100 pointer-events-auto scale-100"
+            )}>
+              <Button
+                size="icon"
+                className={cn(
+                  "h-10 w-10 rounded-full transition-all z-10",
+                  prompt.trim() ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-muted text-muted-foreground hover:bg-muted/80",
+                  isGenerating && "bg-muted text-muted-foreground cursor-not-allowed"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleGenerate()
+                }}
+                disabled={isGenerating || !prompt.trim()}
+              >
+                {isGenerating ? (
+                  <Sparkles className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 ml-0.5" />
+                )}
+              </Button>
+            </div>
           </div>
 
-          {isExpanded && (
-            <div
-              className="h-px bg-border/50 mx-2 my-1"
-              style={{ transition: 'opacity 300ms ease, transform 300ms ease' }}
-            />
-          )}
-
-          {isExpanded && (
-            <div
-              className="flex items-center justify-between px-2 py-2 gap-2 overflow-x-auto no-scrollbar"
-              style={{
-                animation: `slideDown ${UI_CONSTANTS.ANIMATION.SLIDE_DOWN_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
-              }}
-            >
+          <div 
+            className={cn(
+              "grid transition-all duration-300 ease-in-out",
+              isExpanded ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 mt-0"
+            )}
+          >
+            <div className="overflow-hidden">
+              <div className="h-px bg-border/50 mx-3 mb-3" />
+              
+              <div className="flex items-center justify-between px-3 pb-1 gap-2 overflow-x-auto no-scrollbar">
 
             <div className="flex items-center gap-2 shrink-0">
               <Select value={selectedModel} onValueChange={(val) => setModel(val || "")}>
-                <SelectTrigger className="h-9 min-w-[160px] max-w-[200px] bg-secondary/50 border-0 rounded-lg text-xs font-medium hover:bg-secondary transition-colors focus:ring-0 shadow-sm">
+                <SelectTrigger className="h-9 min-w-[160px] max-w-[200px] bg-secondary/50 border-0 rounded-xl text-xs font-medium hover:bg-secondary transition-colors focus:ring-0 shadow-sm">
                   <div className="flex items-center truncate">
                     <Layers className="w-3.5 h-3.5 mr-2 text-primary shrink-0" />
                     <span className="truncate">{selectedModel || "选择模型"}</span>
                   </div>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl">
                   {availableModels.map(m => (
-                    <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
+                    <SelectItem key={m.id} value={m.name} className="rounded-lg">{m.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -282,7 +279,7 @@ export function ControlPanel() {
                       variant="ghost"
                       size="sm"
                       className={cn(
-                        "h-9 rounded-lg text-xs font-medium border border-transparent hover:bg-secondary",
+                        "h-9 rounded-xl text-xs font-medium border border-transparent hover:bg-secondary",
                         selectedStyles.length > 0 && "text-primary bg-primary/10 border-primary/20",
                         props.className
                       )}
@@ -292,7 +289,7 @@ export function ControlPanel() {
                     </Button>
                   )}
                 />
-                <PopoverContent className="w-80 p-0 overflow-hidden rounded-xl border-border/50 shadow-xl" align="end" side="top" sideOffset={8}>
+                <PopoverContent className="w-80 p-0 overflow-hidden rounded-2xl border-border/50 shadow-xl" align="end" side="top" sideOffset={8}>
                   <div className="p-3 bg-muted/30 border-b border-border/50">
                     <h4 className="font-medium text-sm">艺术风格</h4>
                   </div>
@@ -302,7 +299,7 @@ export function ControlPanel() {
                         key={style.id}
                         onClick={() => toggleStyle(style.name)}
                         className={cn(
-                          "cursor-pointer px-3 py-2 rounded-lg text-xs transition-all flex items-center justify-between group",
+                          "cursor-pointer px-3 py-2 rounded-xl text-xs transition-all flex items-center justify-between group",
                           selectedStyles.includes(style.name)
                             ? "bg-primary text-primary-foreground shadow-sm"
                             : "hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -324,7 +321,7 @@ export function ControlPanel() {
                       variant="ghost"
                       size="sm"
                       className={cn(
-                        "h-9 rounded-lg text-xs font-medium hover:bg-secondary",
+                        "h-9 rounded-xl text-xs font-medium hover:bg-secondary",
                         props.className
                       )}
                     >
@@ -333,13 +330,13 @@ export function ControlPanel() {
                     </Button>
                   )}
                 />
-                <PopoverContent className="w-80 p-4 rounded-xl border-border/50 shadow-xl" align="end" side="top" sideOffset={8}>
+                <PopoverContent className="w-80 p-4 rounded-2xl border-border/50 shadow-xl" align="end" side="top" sideOffset={8}>
                   <div className="space-y-5">
 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-medium text-muted-foreground">画幅比例</Label>
-                        <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{width}x{height}</span>
+                        <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-md text-muted-foreground">{width}x{height}</span>
                       </div>
                       <div className="grid grid-cols-5 gap-2">
                         {RATIO_LIST.map(r => (
@@ -347,7 +344,7 @@ export function ControlPanel() {
                             key={r.label}
                             onClick={() => handleRatioSelect(r.w, r.h)}
                             className={cn(
-                              "flex flex-col items-center justify-center p-1 rounded-lg border transition-all h-14",
+                              "flex flex-col items-center justify-center p-1 rounded-xl border transition-all h-14",
                               width === r.w && height === r.h
                                 ? "border-primary bg-primary/5 text-primary shadow-[0_0_0_1px_var(--color-primary)]"
                                 : "border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -424,7 +421,7 @@ export function ControlPanel() {
               <Button
                 size="sm"
                 className={cn(
-                  "h-9 px-4 rounded-lg font-semibold shadow-lg transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-primary to-purple-600 text-white hover:shadow-primary/25",
+                  "h-9 px-4 rounded-xl font-semibold shadow-lg transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-primary to-purple-600 text-white hover:shadow-primary/25",
                   isGenerating && "bg-muted text-muted-foreground cursor-not-allowed"
                 )}
                 onClick={handleGenerate}
@@ -442,8 +439,9 @@ export function ControlPanel() {
 
             </div>
           </div>
-          )}
         </div>
+      </div>
+      </div>
       </div>
       </div>
     </>
