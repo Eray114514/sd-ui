@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import axios from "axios"
 import { ImageDetailModal } from "@/components/custom/ImageDetailModal"
-import { Loader2, Search, Filter, Clock, Heart, Download, TrashIcon, AlertCircle } from "lucide-react"
+import { Loader2, Search, Filter, Clock, Heart, Download, TrashIcon, AlertCircle, Star, CheckSquare } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -20,6 +20,8 @@ export default function AssetsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [page, setPage] = useState(0)
   const [deleteImageConfirmId, setDeleteImageConfirmId] = useState<string | null>(null)
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const observer = useRef<IntersectionObserver | null>(null)
 
@@ -128,6 +130,7 @@ export default function AssetsPage() {
 
   const filteredImages = useMemo(() =>
     images.filter(img => {
+      // For "images" tab, we just show all images (since we don't have video)
       const matchesTab = activeTab === "favorites" ? img.isFavorite : true
       const matchesSearch = img.task.prompt.toLowerCase().includes(searchQuery.toLowerCase())
       return matchesTab && matchesSearch
@@ -160,34 +163,77 @@ export default function AssetsPage() {
     <div className="min-h-screen bg-background p-6 md:p-8 pb-[400px]">
 
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-col md:flex-row gap-4 sticky top-0 z-30 bg-background/80 backdrop-blur-md py-4 -mx-2 px-2 border-b border-border/50 transition-all">
-          <div className="flex items-center gap-2 w-full md:w-auto bg-muted/30 p-1 rounded-xl border border-border/50">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-              <TabsList className="bg-transparent">
-                <TabsTrigger value="all" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">全部作品</TabsTrigger>
-                <TabsTrigger value="favorites" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">我的收藏</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-          
-          <div className="relative flex-1 max-w-md ml-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="搜索提示词..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-secondary/50 border-transparent focus:bg-background transition-all rounded-xl"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-10 rounded-xl border-border/50">
-              <Filter className="h-4 w-4 mr-2" />
-              筛选
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 sticky top-0 z-30 bg-background/80 backdrop-blur-md py-4 -mx-2 px-2 border-b border-border/50 transition-all">
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="flex items-center bg-muted/30 rounded-full border border-border/50 p-1">
+              <Tabs value={activeTab === 'favorites' ? 'all' : activeTab} onValueChange={(v) => setActiveTab(v)}>
+                <TabsList className="bg-transparent h-8">
+                  <TabsTrigger value="all" className="rounded-full px-4 text-xs data-[state=active]:bg-foreground data-[state=active]:text-background transition-colors">全部</TabsTrigger>
+                  <TabsTrigger value="images" className="rounded-full px-4 text-xs data-[state=active]:bg-foreground data-[state=active]:text-background transition-colors">图片</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className={`rounded-full h-10 px-4 flex items-center gap-2 text-xs transition-colors bg-muted/30 border border-border/50 hover:bg-muted ${activeTab === 'favorites' ? 'bg-foreground text-background hover:bg-foreground/90' : 'text-muted-foreground'}`}
+              onClick={() => setActiveTab(activeTab === 'favorites' ? 'all' : 'favorites')}
+            >
+              <Star className={`h-4 w-4 ${activeTab === 'favorites' ? 'fill-background' : ''}`} />
+              收藏
             </Button>
-            <Button variant="outline" size="sm" className="h-10 rounded-xl border-border/50">
-              <Clock className="h-4 w-4 mr-2" />
-              最新
+          </div>
+
+          <div className="flex items-center bg-muted/30 border border-border/50 rounded-full h-10 overflow-hidden w-full md:w-auto">
+            <div 
+              className={`flex items-center transition-all duration-300 ease-in-out ${isSearchExpanded || searchQuery ? 'w-48 pl-3' : 'w-20 pl-0 cursor-pointer hover:bg-muted/50'}`}
+              onClick={() => {
+                if (!isSearchExpanded && !searchQuery) {
+                  setIsSearchExpanded(true)
+                  setTimeout(() => searchInputRef.current?.focus(), 100)
+                }
+              }}
+            >
+              <div className="flex items-center justify-center w-full h-full text-muted-foreground" style={{ display: isSearchExpanded || searchQuery ? 'none' : 'flex' }}>
+                <Search className="h-4 w-4 mr-1.5" />
+                <span className="text-xs font-medium">搜索</span>
+              </div>
+              <div className="relative w-full h-full flex items-center" style={{ display: isSearchExpanded || searchQuery ? 'flex' : 'none' }}>
+                <Search className="absolute left-0 h-4 w-4 text-muted-foreground" />
+                <Input
+                  ref={searchInputRef}
+                  type="search"
+                  placeholder="搜索..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onBlur={() => {
+                    if (!searchQuery) setIsSearchExpanded(false)
+                  }}
+                  className="w-full h-full pl-6 pr-3 bg-transparent border-0 ring-0 focus-visible:ring-0 text-xs shadow-none"
+                />
+              </div>
+            </div>
+
+            <div className="w-px h-4 bg-border/50 shrink-0" />
+
+            <Button variant="ghost" size="sm" className="h-full rounded-none px-4 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground">
+              <Filter className="h-3.5 w-3.5 mr-1.5" />
+              模型
+            </Button>
+
+            <div className="w-px h-4 bg-border/50 shrink-0" />
+
+            <Button variant="ghost" size="sm" className="h-full rounded-none px-4 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground">
+              <Filter className="h-3.5 w-3.5 mr-1.5" />
+              时间
+            </Button>
+
+            <div className="w-px h-4 bg-border/50 shrink-0" />
+
+            <Button variant="ghost" size="sm" className="h-full rounded-none px-4 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground">
+              <CheckSquare className="h-3.5 w-3.5 mr-1.5" />
+              批量
             </Button>
           </div>
         </div>
