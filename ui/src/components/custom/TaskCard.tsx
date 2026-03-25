@@ -37,6 +37,15 @@ export const TaskCard = memo(function TaskCard({ task, progressData, setSelected
   const [deleteTaskConfirmId, setDeleteTaskConfirmId] = useState<string | null>(null)
   const [deleteImageConfirmId, setDeleteImageConfirmId] = useState<string | null>(null)
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set())
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set())
+
+  const handleImageLoad = useCallback((id: string) => {
+    setLoadedImages(prev => {
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }, [])
 
   const handleDeleteTask = useCallback(async (taskId: string) => {
     try {
@@ -198,12 +207,16 @@ export const TaskCard = memo(function TaskCard({ task, progressData, setSelected
               className="relative group rounded-xl overflow-hidden bg-muted border border-border/50 cursor-pointer break-inside-avoid mb-2 z-0"
               onClick={() => setSelectedImage({ ...img, task } as ImageWithTask)}
             >
+              <div className={`w-full h-[300px] bg-muted flex items-center justify-center transition-opacity duration-500 absolute inset-0 ${loadedImages.has(img.id) ? 'opacity-0 z-[-1] pointer-events-none' : 'opacity-100 z-0'}`}>
+                <Loader2Icon className="w-5 h-5 text-muted-foreground animate-spin" />
+              </div>
               <img
                 src={`/api/image?path=${encodeURIComponent(img.path)}`}
                 alt="Generated"
-                className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-105"
+                className={`w-full h-auto transition-all duration-700 aspect-square object-cover ${loadedImages.has(img.id) ? 'opacity-100 scale-100' : 'opacity-0 scale-95'} group-hover:scale-105`}
                 loading="lazy"
                 decoding="async"
+                onLoad={() => handleImageLoad(img.id)}
               />
               <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-2 z-10 pointer-events-none">
                 <div className="flex justify-end gap-1.5 pointer-events-auto" onClick={(e) => e.stopPropagation()}>

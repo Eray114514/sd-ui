@@ -9,6 +9,7 @@ import { tasksPollingManager, progressPollingManager } from "@/lib/pollingManage
 import type { Task, ProgressData, ImageWithTask } from "@/types"
 import { TaskCard } from "@/components/custom/TaskCard"
 import { ImageDetailModal } from "@/components/custom/ImageDetailModal"
+import { Loader2 } from "lucide-react"
 
 export function TaskList() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -20,6 +21,7 @@ export function TaskList() {
   const [progressDataSnapshot, setProgressDataSnapshot] = useState<Record<string, ProgressData>>({})
   const rafIdRef = useRef<number | null>(null)
   const lastUpdateRef = useRef<number>(0)
+  const [isInitialLoaded, setIsInitialLoaded] = useState(false)
 
   const updateProgressSnapshot = useCallback(() => {
     const now = Date.now()
@@ -47,7 +49,12 @@ export function TaskList() {
         bottomRef.current.scrollIntoView(scrollOptions)
       }
 
+      if (initialLoadRef.current) {
+        setTimeout(() => setIsInitialLoaded(true), 50)
+      }
       initialLoadRef.current = false
+    } else if (tasks.length === 0 && !initialLoadRef.current) {
+      setIsInitialLoaded(true)
     }
   }, [tasks.length])
 
@@ -80,8 +87,10 @@ export function TaskList() {
       try {
         const data = await getTasks()
         setTasks(data)
+        if (data.length === 0) setIsInitialLoaded(true)
       } catch (e) {
         console.error('Failed to fetch tasks:', e)
+        setIsInitialLoaded(true)
       }
     }
 
@@ -141,7 +150,16 @@ export function TaskList() {
   }, [tasks, scheduleProgressUpdate])
 
   return (
-    <div className="w-full px-4 pt-6 pb-[20px] flex flex-col items-center">
+    <>
+      {!isInitialLoaded && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background h-[100dvh]">
+          <div className="flex flex-col items-center gap-4 text-muted-foreground">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-sm font-medium">正在加载生成记录...</p>
+          </div>
+        </div>
+      )}
+      <div className={`w-full px-4 pt-6 pb-[20px] flex flex-col items-center transition-opacity duration-300 ${isInitialLoaded ? 'opacity-100' : 'opacity-0'}`}>
       <div className="w-full max-w-4xl flex flex-col gap-8">
         {tasks.length === 0 && <p className="text-muted-foreground text-center mt-20">暂无生成记录，开始你的创作吧</p>}
 
@@ -171,5 +189,6 @@ export function TaskList() {
         </div>
       </div>
     </div>
+    </>
   )
 }

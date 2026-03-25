@@ -23,6 +23,20 @@ export default function AssetsPage() {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
+  const [selectedModel, setSelectedModel] = useState<string>("")
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
+  const [isBatchMode, setIsBatchMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const allModels = useMemo(() => {
+    const models = new Set<string>()
+    images.forEach(img => {
+      const model = img.task.model_checkpoint
+      if (model) models.add(model)
+    })
+    return Array.from(models)
+  }, [images])
+
   const observer = useRef<IntersectionObserver | null>(null)
 
   const fetchImages = async (pageNum?: number) => {
@@ -116,6 +130,33 @@ export default function AssetsPage() {
     }
   }
 
+  const handleBatchDelete = async () => {
+    if (!confirm(`确定要删除选中的 ${selectedIds.size} 张图片吗？`)) return
+    try {
+      await Promise.all(Array.from(selectedIds).map(id => axios.delete('/api/assets', { data: { id } })))
+      setImages(prev => prev.filter(img => !selectedIds.has(img.id)))
+      setSelectedIds(new Set())
+      setIsBatchMode(false)
+    } catch (e) {
+      console.error('Batch delete fail:', e)
+    }
+  }
+
+  const handleBatchFavorite = async () => {
+    try {
+      const selectedImgs = images.filter(img => selectedIds.has(img.id))
+      const allFavorited = selectedImgs.every(img => img.isFavorite)
+      const newStatus = !allFavorited
+      
+      await Promise.all(Array.from(selectedIds).map(id => axios.put('/api/assets', { id, isFavorite: newStatus })))
+      setImages(prev => prev.map(img => selectedIds.has(img.id) ? { ...img, isFavorite: newStatus } : img))
+      setSelectedIds(new Set())
+      setIsBatchMode(false)
+    } catch (e) {
+      console.error('Batch favorite fail:', e)
+    }
+  }
+
   const handleDownloadImage = (path: string) => {
     const link = document.createElement("a")
     link.href = `/api/image?path=${encodeURIComponent(path)}`
@@ -128,15 +169,19 @@ export default function AssetsPage() {
     [selectedImage, images]
   )
 
-  const filteredImages = useMemo(() =>
-    images.filter(img => {
+  const filteredImages = useMemo(() => {
+    return images.filter(img => {
       // For "images" tab, we just show all images (since we don't have video)
       const matchesTab = activeTab === "favorites" ? img.isFavorite : true
       const matchesSearch = img.task.prompt.toLowerCase().includes(searchQuery.toLowerCase())
-      return matchesTab && matchesSearch
-    }),
-    [images, activeTab, searchQuery]
-  )
+      const matchesModel = selectedModel ? img.task.model_checkpoint === selectedModel : true
+      return matchesTab && matchesSearch && matchesModel
+    }).sort((a, b) => {
+      const timeA = new Date(a.createdAt).getTime()
+      const timeB = new Date(b.createdAt).getTime()
+      return sortOrder === 'desc' ? timeB - timeA : timeA - timeB
+    })
+  }, [images, activeTab, searchQuery, selectedModel, sortOrder])
 
   const groupedImages = useMemo(() => {
     const groups: { date: string; images: ImageWithTask[] }[] = []
@@ -217,21 +262,66 @@ export default function AssetsPage() {
 
             <div className="w-px h-4 bg-border/50 shrink-0" />
 
-            <Button variant="ghost" size="sm" className="h-full rounded-none px-4 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground">
-              <Filter className="h-3.5 w-3.5 mr-1.5" />
-              模型
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className={`h-full rounded-none px-4 text-xs font-medium hover:bg-muted/50 transition-colors ${selectedModel ? 'text-primary bg-primary/5' : 'text-muted-foreground hover:text-foreground'}`}>
+                  <Filter className="h-3.5 w-3.5 mr-1.5" />
+                  {selectedModel ? selectedModel.substring(0, 8) + '...' : '模型'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2 rounded-xl shadow-xl border-border/50" align="end" sideOffset={8}>
+                <div className="flex flex-col gap-1 max-h-60 overflow-y-auto">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setSelectedModel("")} 
+                    className={`justify-start text-xs rounded-lg ${!selectedModel ? 'bg-primary/10 text-primary hover:bg-primary/20' : ''}`}
+                  >
+                    全部模型
+                  </Button>
+                  {allModels.map(model => (
+                    <Button 
+                      key={model} 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setSelectedModel(model)} 
+                      className={`justify-start text-xs rounded-lg ${selectedModel === model ? 'bg-primary/10 text-primary hover:bg-primary/20' : ''}`}
+                      title={model}
+                    >
+                      <span className="truncate">{model}</span>
+                    </Button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <div className="w-px h-4 bg-border/50 shrink-0" />
+
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-full rounded-none px-4 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors max-w-[80px]"
+              onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+            >
+              <Filter className={`h-3.5 w-3.5 mr-1.5 transition-transform ${sortOrder === 'asc' ? 'rotate-180 text-primary' : ''}`} />
+              <span className={sortOrder === 'asc' ? 'text-primary' : ''}>{sortOrder === 'desc' ? '降序' : '升序'}</span>
             </Button>
 
             <div className="w-px h-4 bg-border/50 shrink-0" />
 
-            <Button variant="ghost" size="sm" className="h-full rounded-none px-4 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground">
-              <Filter className="h-3.5 w-3.5 mr-1.5" />
-              时间
-            </Button>
-
-            <div className="w-px h-4 bg-border/50 shrink-0" />
-
-            <Button variant="ghost" size="sm" className="h-full rounded-none px-4 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className={`h-full rounded-none px-4 text-xs font-medium transition-colors ${isBatchMode ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
+              onClick={() => {
+                if (isBatchMode) {
+                  setIsBatchMode(false)
+                  setSelectedIds(new Set())
+                } else {
+                  setIsBatchMode(true)
+                }
+              }}
+            >
               <CheckSquare className="h-3.5 w-3.5 mr-1.5" />
               批量
             </Button>
@@ -259,8 +349,18 @@ export default function AssetsPage() {
                     <div
                       key={img.id}
                       ref={isLastImage ? lastImageElementRef : null}
-                      className="group relative aspect-square rounded-2xl overflow-hidden bg-muted cursor-zoom-in border border-transparent hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/10 z-0"
-                      onClick={() => handleImageClick(img)}
+                      className={`group relative aspect-square rounded-2xl overflow-hidden bg-muted border ${isBatchMode && selectedIds.has(img.id) ? 'border-primary ring-2 ring-primary/20 scale-[0.98]' : 'border-transparent hover:border-primary/50'} cursor-zoom-in transition-all hover:shadow-lg hover:shadow-primary/10 z-0`}
+                      onClick={(e) => {
+                        if (isBatchMode) {
+                          e.stopPropagation()
+                          const next = new Set(selectedIds)
+                          if (next.has(img.id)) next.delete(img.id)
+                          else next.add(img.id)
+                          setSelectedIds(next)
+                        } else {
+                          handleImageClick(img)
+                        }
+                      }}
                     >
                       <img
                         src={`/api/image?path=${encodeURIComponent(img.path)}`}
@@ -269,8 +369,17 @@ export default function AssetsPage() {
                         loading="lazy"
                       />
 
-                      <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-3 z-10 pointer-events-none">
-                        <div className="flex justify-end gap-2 pointer-events-auto">
+                      {isBatchMode && (
+                        <div className="absolute top-3 left-3 z-20 pointer-events-none">
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selectedIds.has(img.id) ? 'bg-primary border-primary text-background' : 'bg-black/40 border-white/50 text-transparent'}`}>
+                            <CheckSquare className="w-3.5 h-3.5" />
+                          </div>
+                        </div>
+                      )}
+
+                      {!isBatchMode && (
+                        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-3 z-10 pointer-events-none">
+                          <div className="flex justify-end gap-2 pointer-events-auto">
                           <Button
                             variant="secondary"
                             size="icon"
@@ -340,6 +449,22 @@ export default function AssetsPage() {
             </div>
           )
         })}
+
+        {isBatchMode && (
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-popover/90 backdrop-blur-xl border border-border rounded-full px-5 py-3 flex items-center gap-4 z-50 shadow-2xl animate-in slide-in-from-bottom-5">
+            <span className="text-sm font-medium pr-2 border-r border-border">已选择 <strong className="text-primary">{selectedIds.size}</strong> 项</span>
+            <Button variant="ghost" size="sm" className="rounded-full h-8 px-3 text-xs" onClick={handleBatchFavorite} disabled={selectedIds.size === 0}>
+              <Star className="w-3.5 h-3.5 mr-1.5" /> 收藏管理
+            </Button>
+            <Button variant="destructive" size="sm" className="rounded-full h-8 px-3 text-xs" onClick={handleBatchDelete} disabled={selectedIds.size === 0}>
+              <TrashIcon className="w-3.5 h-3.5 mr-1.5" /> 批量删除
+            </Button>
+            <div className="w-px h-4 bg-border shrink-0 mx-1" />
+            <Button variant="ghost" size="sm" className="rounded-full h-8 px-3 text-xs text-muted-foreground hover:text-foreground" onClick={() => { setIsBatchMode(false); setSelectedIds(new Set()); }}>
+              退出批量
+            </Button>
+          </div>
+        )}
 
         {isLoading && (
           <div className="flex justify-center py-12">
