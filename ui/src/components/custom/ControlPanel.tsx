@@ -178,7 +178,7 @@ export function ControlPanel() {
   return (
     <>
       <div className="fixed bottom-0 left-0 lg:left-[80px] right-0 z-40 px-4 pb-4 transition-all duration-300 pointer-events-none flex flex-col items-center">
-        <div className="w-full max-w-5xl relative pointer-events-auto flex flex-col items-center">
+        <div className="w-full max-w-4xl relative pointer-events-auto flex flex-col items-center">
           {!isExpanded && (
             <div className="absolute -top-10 w-full flex justify-end z-50 pointer-events-none max-w-[600px] mx-auto left-0 right-0">
               <Button

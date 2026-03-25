@@ -120,7 +120,7 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-background p-6 md:p-8 pb-32">
+        <div className="min-h-screen bg-background p-6 md:p-8 pb-[100px]">
             <div className="max-w-4xl mx-auto space-y-8">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-500 flex items-center gap-3">

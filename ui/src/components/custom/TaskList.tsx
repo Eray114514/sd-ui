@@ -142,7 +142,7 @@ export function TaskList() {
 
   return (
     <div className="w-full px-4 pt-6 pb-[20px] flex flex-col items-center">
-      <div className="w-full max-w-5xl flex flex-col gap-8">
+      <div className="w-full max-w-4xl flex flex-col gap-8">
         {tasks.length === 0 && <p className="text-muted-foreground text-center mt-20">暂无生成记录，开始你的创作吧</p>}
 
         {selectedImage && (
