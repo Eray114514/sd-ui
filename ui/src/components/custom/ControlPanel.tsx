@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -54,7 +54,8 @@ export function ControlPanel() {
   const [availableModels, setAvailableModels] = useState<Model[]>([])
   const [availableStyles, setAvailableStyles] = useState<Style[]>([])
   const [isExpanded, setIsExpanded] = useState(true)
-  const [lastScrollY, setLastScrollY] = useState(0)
+  const lastScrollYRef = useRef(0)
+  const scrollThrottleRef = useRef(false)
   const [textareaHeight, setTextareaHeight] = useState(80)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -66,32 +67,48 @@ export function ControlPanel() {
   }, [isExpanded, textareaHeight])
 
   useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY
+    const SCROLL_THRESHOLD = 30 // 最少滚动 30px 才触发折叠/展开变化
+    const THROTTLE_MS = 100
 
+    const handleScroll = () => {
+      if (scrollThrottleRef.current) return
+      scrollThrottleRef.current = true
+      setTimeout(() => { scrollThrottleRef.current = false }, THROTTLE_MS)
+
+      const currentScrollY = window.scrollY
+      const lastScrollY = lastScrollYRef.current
+      const delta = currentScrollY - lastScrollY
+
+      // textarea 获得焦点时不改变折叠状态
       if (document.activeElement === textareaRef.current) {
-        setLastScrollY(currentScrollY)
+        lastScrollYRef.current = currentScrollY
         return
       }
 
+      // 在页面底部时展开
       const isAtBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 50
       if (isAtBottom) {
         setIsExpanded(true)
-        setLastScrollY(currentScrollY)
+        lastScrollYRef.current = currentScrollY
         return
       }
 
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+      // 需要超过阈值才触发状态变化，防止快速反复滚动的抽搐
+      if (Math.abs(delta) < SCROLL_THRESHOLD) return
+
+      if (delta > 0 && currentScrollY > 100) {
+        // 向下滚动 → 展开
         setIsExpanded(true)
-      } else if (currentScrollY < lastScrollY && currentScrollY > 100) {
+      } else if (delta < 0 && currentScrollY > 100) {
+        // 向上滚动 → 折叠（有文本也允许折叠）
         setIsExpanded(false)
       }
-      setLastScrollY(currentScrollY)
+      lastScrollYRef.current = currentScrollY
     }
 
     window.addEventListener("scroll", handleScroll, { passive: true })
     return () => window.removeEventListener("scroll", handleScroll)
-  }, [lastScrollY])
+  }, [])
 
   const selectedRatio = `${width}:${height}`
 
@@ -159,12 +176,17 @@ export function ControlPanel() {
     setDimensions(w, h)
   }
 
-  const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleTextareaInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPrompt(e.target.value)
 
-    const newHeight = Math.min(e.target.scrollHeight, UI_CONSTANTS.CONTROL_PANEL.MAX_TEXTAREA_HEIGHT)
-    setTextareaHeight(Math.max(newHeight, UI_CONSTANTS.CONTROL_PANEL.MIN_TEXTAREA_HEIGHT))
-  }
+    // 先将高度重置为 0，再读 scrollHeight，这样清空文本后才能正确缩小
+    const el = e.target
+    el.style.height = '0px'
+    const newHeight = Math.min(el.scrollHeight, UI_CONSTANTS.CONTROL_PANEL.MAX_TEXTAREA_HEIGHT)
+    const finalHeight = Math.max(newHeight, UI_CONSTANTS.CONTROL_PANEL.MIN_TEXTAREA_HEIGHT)
+    el.style.height = finalHeight + 'px'
+    setTextareaHeight(finalHeight)
+  }, [setPrompt])
 
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -194,7 +216,7 @@ export function ControlPanel() {
 
         <div className={cn(
           "bg-card/90 backdrop-blur-xl border border-border/60 shadow-xl shadow-black/5 dark:shadow-none relative mx-auto transition-all ease-in-out",
-          isExpanded ? "w-full rounded-[32px] p-3" : "w-full max-w-[600px] rounded-[32px] p-2"
+          isExpanded ? "w-full max-w-4xl rounded-[32px] p-3" : "w-full max-w-[600px] rounded-[32px] p-2"
         )}
         style={{
           transitionDuration: `${UI_CONSTANTS.CONTROL_PANEL.TRANSITION_DURATION}ms`,
@@ -211,7 +233,7 @@ export function ControlPanel() {
                 "border-none focus-visible:ring-0 resize-none bg-transparent text-sm placeholder:text-muted-foreground/60 w-full transition-all",
                 isExpanded ? "py-3 px-4 pb-4" : "h-[48px] min-h-[48px] py-3 px-4 pr-14 overflow-hidden whitespace-nowrap cursor-pointer"
               )}
-              style={isExpanded ? { height: textareaHeight + 'px', minHeight: '48px', maxHeight: '300px' } : undefined}
+              style={{ height: isExpanded ? textareaHeight + 'px' : '48px', minHeight: '48px', maxHeight: '300px' }}
               onClick={() => !isExpanded && setIsExpanded(true)}
               ref={textareaRef}
             />
@@ -248,7 +270,7 @@ export function ControlPanel() {
               isExpanded ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 mt-0"
             )}
           >
-            <div className="overflow-hidden">
+            <div className="overflow-hidden min-h-0">
               <div className="h-px bg-border/50 mx-3 mb-3" />
               
               <div className="flex items-center justify-between px-3 pb-1 gap-2 overflow-x-auto no-scrollbar">

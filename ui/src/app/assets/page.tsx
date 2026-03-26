@@ -263,11 +263,9 @@ export default function AssetsPage() {
             <div className="w-px h-4 bg-border/50 shrink-0" />
 
             <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className={`h-full rounded-none px-4 text-xs font-medium hover:bg-muted/50 transition-colors ${selectedModel ? 'text-primary bg-primary/5' : 'text-muted-foreground hover:text-foreground'}`}>
-                  <Filter className="h-3.5 w-3.5 mr-1.5" />
-                  {selectedModel ? selectedModel.substring(0, 8) + '...' : '模型'}
-                </Button>
+              <PopoverTrigger className={`inline-flex items-center justify-center whitespace-nowrap h-full rounded-none px-4 text-xs font-medium hover:bg-muted/50 transition-colors ${selectedModel ? 'text-primary bg-primary/5' : 'text-muted-foreground hover:text-foreground'}`}>
+                <Filter className="h-3.5 w-3.5 mr-1.5" />
+                {selectedModel ? selectedModel.substring(0, 8) + '...' : '模型'}
               </PopoverTrigger>
               <PopoverContent className="w-56 p-2 rounded-xl shadow-xl border-border/50" align="end" sideOffset={8}>
                 <div className="flex flex-col gap-1 max-h-60 overflow-y-auto">
@@ -378,6 +376,7 @@ export default function AssetsPage() {
                       )}
 
                       {!isBatchMode && (
+                        <>
                         <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-3 z-10 pointer-events-none">
                           <div className="flex justify-end gap-2 pointer-events-auto">
                           <Button
@@ -442,6 +441,8 @@ export default function AssetsPage() {
                           </div>
                         </div>
                       </div>
+                      </>
+                      )}
                     </div>
                   )
                 })}

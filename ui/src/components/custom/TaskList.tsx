@@ -17,6 +17,7 @@ export function TaskList() {
   const [selectedImage, setSelectedImage] = useState<ImageWithTask | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const initialLoadRef = useRef(true)
+  const shouldScrollRef = useRef(false)
   const progressDataRef = useRef<Record<string, ProgressData>>({})
   const [progressDataSnapshot, setProgressDataSnapshot] = useState<Record<string, ProgressData>>({})
   const rafIdRef = useRef<number | null>(null)
@@ -40,19 +41,19 @@ export function TaskList() {
   }, [updateProgressSnapshot])
 
   useEffect(() => {
-    if (bottomRef.current && tasks.length > 0) {
-      const scrollOptions: ScrollIntoViewOptions = initialLoadRef.current
-        ? { behavior: "instant", block: "end" }
-        : { behavior: "smooth", block: "end" }
-
-      if ('scrollIntoView' in bottomRef.current) {
-        bottomRef.current.scrollIntoView(scrollOptions)
-      }
-
+    if (tasks.length > 0) {
       if (initialLoadRef.current) {
-        setTimeout(() => setIsInitialLoaded(true), 50)
+        // 初始加载：滚动到绝对底部
+        requestAnimationFrame(() => {
+          window.scrollTo(0, document.documentElement.scrollHeight)
+          setTimeout(() => setIsInitialLoaded(true), 50)
+        })
+        initialLoadRef.current = false
+      } else if (shouldScrollRef.current && bottomRef.current) {
+        // 仅在用户手动创建任务时自动下滚，轮询刷新不触发
+        bottomRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
+        shouldScrollRef.current = false
       }
-      initialLoadRef.current = false
     } else if (tasks.length === 0 && !initialLoadRef.current) {
       setIsInitialLoaded(true)
     }
@@ -95,6 +96,7 @@ export function TaskList() {
     }
 
     const handleTaskCreated = () => {
+      shouldScrollRef.current = true // 用户创建任务时标记需要自动下滚
       fetchTasks()
     }
 
@@ -184,8 +186,8 @@ export function TaskList() {
               onTasksChange={handleTasksChange}
             />
           ))}
-          <div ref={bottomRef} />
           <div id="bottom-spacer" style={{ height: `${bottomSpacerHeight}px` }} />
+          <div ref={bottomRef} className="h-px w-full" />
         </div>
       </div>
     </div>
