@@ -79,7 +79,7 @@ elif [ "$BACKEND_CHANGED" = true ]; then
         exit 1
     fi
 elif [ "$FRONTEND_ONLY" = true ]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') Frontend only changes, rebuilding..." >> "$GIT_LOG"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') Frontend only changes, rebuilding without restart..." >> "$GIT_LOG"
     git_reset_and_pull
     npm install >> "$GIT_LOG" 2>&1
     npx prisma generate >> "$GIT_LOG" 2>&1
@@ -90,8 +90,7 @@ elif [ "$FRONTEND_ONLY" = true ]; then
         node "$STATIC_SYNC" >> "$GIT_LOG" 2>&1 || true
     fi
 
-    systemctl --user restart sd-ui
-    echo "$(date '+%Y-%m-%d %H:%M:%S') Frontend rebuilt and synced successfully" >> "$GIT_LOG"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') Frontend rebuilt successfully (no restart - Next.js hot reload handles it)" >> "$GIT_LOG"
 else
     echo "$(date '+%Y-%m-%d %H:%M:%S') Generic update, performing hot deployment..." >> "$GIT_LOG"
     git_reset_and_pull
