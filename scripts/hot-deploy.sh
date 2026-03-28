@@ -53,7 +53,7 @@ log "Installing dependencies..."
 npm ci --silent 2>&1 | tee -a "$LOG_FILE"
 
 log "Generating Prisma..."
-npx prisma generate --silent 2>&1 | tee -a "$LOG_FILE"
+npx prisma generate 2>&1 | tee -a "$LOG_FILE"
 
 log "Building..."
 npm run build 2>&1 | tee -a "$LOG_FILE"

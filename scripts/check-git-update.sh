@@ -6,7 +6,7 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="$REPO_DIR/ui"
 LOG_DIR="${HOME}/.local/share/sd-ui/logs"
 GIT_LOG="$LOG_DIR/git-pull.log"
-STATIC_SYNC="$APP_DIR/scripts/sync-standalone-static.mjs"
+STATIC_SYNC="$SCRIPT_DIR/sync-standalone-static.mjs"
 
 mkdir -p "$LOG_DIR"
 
@@ -70,7 +70,7 @@ elif [ "$FRONTEND_ONLY" = true ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Frontend only changes, rebuilding..." >> "$GIT_LOG"
     git pull origin main >> "$GIT_LOG" 2>&1
     npm ci --silent >> "$GIT_LOG" 2>&1
-    npx prisma generate --silent >> "$GIT_LOG" 2>&1
+    npx prisma generate >> "$GIT_LOG" 2>&1
     npm run build >> "$GIT_LOG" 2>&1
 
     if [ -f "$STATIC_SYNC" ]; then
