@@ -38,8 +38,8 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=$APP_DIR
 Environment=NODE_ENV=production
-Environment=DATABASE_URL=file:./dev.db
-ExecStart=/bin/bash -c 'if [ ! -d ".next" ]; then npx prisma generate >> $LOG_OUT 2>> $LOG_ERR && npx prisma db push >> $LOG_OUT 2>> $LOG_ERR && npm run build >> $LOG_OUT 2>> $LOG_ERR; fi && mkdir -p $LOG_DIR && if [ -f .next/standalone/server.js ]; then node .next/standalone/server.js -H 0.0.0.0 >> $LOG_OUT 2>> $LOG_ERR; elif [ -f .next/standalone/ui/server.js ]; then node .next/standalone/ui/server.js -H 0.0.0.0 >> $LOG_OUT 2>> $LOG_ERR; else npm run start -- -H 0.0.0.0; fi >> $LOG_OUT 2>> $LOG_ERR'
+Environment=DATABASE_URL=file:$APP_DIR/prisma/prisma/dev.db
+ExecStart=/bin/bash -c 'if [ ! -d ".next" ]; then npx prisma generate >> $LOG_OUT 2>> $LOG_ERR && DATABASE_URL=file:$APP_DIR/prisma/prisma/dev.db npx prisma db push >> $LOG_OUT 2>> $LOG_ERR && npm run build >> $LOG_OUT 2>> $LOG_ERR; fi && mkdir -p $LOG_DIR && if [ -f .next/standalone/server.js ]; then node .next/standalone/server.js -H 0.0.0.0 >> $LOG_OUT 2>> $LOG_ERR; elif [ -f .next/standalone/ui/server.js ]; then node .next/standalone/ui/server.js -H 0.0.0.0 >> $LOG_OUT 2>> $LOG_ERR; else npm run start -- -H 0.0.0.0; fi >> $LOG_OUT 2>> $LOG_ERR'
 Restart=on-failure
 RestartSec=3
 
