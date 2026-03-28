@@ -50,8 +50,17 @@ for file in $CHANGED_FILES; do
         ui/src/*|ui/*.css|ui/components.json)
             FRONTEND_ONLY=true
             ;;
+        *.md|README*|LICENSE|CONTRIBUTING*|.gitignore|.env*|*.yml|*.yaml)
+            ;;
+        *)
+            ;;
     esac
 done
+
+RELEVANT_CHANGE=false
+if [ "$SCRIPTS_CHANGED" = true ] || [ "$BACKEND_CHANGED" = true ] || [ "$FRONTEND_ONLY" = true ]; then
+    RELEVANT_CHANGE=true
+fi
 
 ensure_scripts_executable() {
     chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
@@ -63,6 +72,11 @@ git_reset_and_pull() {
     git reset --hard origin/main 2>&1 | tee -a "$GIT_LOG" || true
     ensure_scripts_executable
 }
+
+if [ "$RELEVANT_CHANGE" = false ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') Only docs/config files changed, no action needed" >> "$GIT_LOG"
+    exit 0
+fi
 
 if [ "$SCRIPTS_CHANGED" = true ] && [ "$BACKEND_CHANGED" = false ] && [ "$FRONTEND_ONLY" = false ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Only scripts changed, no restart needed" >> "$GIT_LOG"
