@@ -1,13 +1,21 @@
 import { PrismaClient } from '@prisma/client'
+import path from 'path'
 
 const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined
 }
 
+// 构建数据库绝对路径，避免 Prisma 相对路径解析问题
+const dbPath = process.env.DATABASE_URL
+    ? process.env.DATABASE_URL.replace(/^file:/, '')
+    : path.join(process.cwd(), 'prisma', 'dev.db')
+
+const databaseUrl = `file:${dbPath}`
+
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({
     datasources: {
         db: {
-            url: (process.env.DATABASE_URL || "file:./prisma/dev.db") + "?connection_limit=5&pool_timeout=10"
+            url: databaseUrl + "?connection_limit=5&pool_timeout=10"
         }
     }
 })
