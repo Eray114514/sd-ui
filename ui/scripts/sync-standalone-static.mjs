@@ -22,12 +22,12 @@ try {
 
 if (!appDir) {
   const dirs = readdirSync(standaloneRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && entry.name !== "node_modules" && entry.name !== ".next")
     .map((entry) => entry.name);
   if (dirs.length === 1) {
     appDir = dirs[0];
-  } else {
-    appDir = dirs.find((name) => name !== "node_modules") ?? dirs[0];
+  } else if (dirs.length > 1) {
+    appDir = dirs.find((name) => name === "ui") ?? dirs[0];
   }
 }
 
