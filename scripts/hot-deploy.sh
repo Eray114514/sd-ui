@@ -46,8 +46,9 @@ log "=== Starting hot deployment ==="
 
 cd "$APP_DIR"
 
-log "Pulling latest code..."
-git pull origin main 2>&1 | tee -a "$LOG_FILE"
+log "Resetting to remote version..."
+git fetch origin
+git reset --hard origin/main 2>&1 | tee -a "$LOG_FILE"
 
 log "Installing dependencies..."
 npm ci --silent 2>&1 | tee -a "$LOG_FILE"
