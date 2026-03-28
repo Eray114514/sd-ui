@@ -81,7 +81,7 @@ elif [ "$BACKEND_CHANGED" = true ]; then
 elif [ "$FRONTEND_ONLY" = true ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Frontend only changes, rebuilding..." >> "$GIT_LOG"
     git_reset_and_pull
-    npm ci --silent >> "$GIT_LOG" 2>&1
+    npm install >> "$GIT_LOG" 2>&1
     npx prisma generate >> "$GIT_LOG" 2>&1
     npm run build >> "$GIT_LOG" 2>&1
 

@@ -51,7 +51,7 @@ git fetch origin
 git reset --hard origin/main 2>&1 | tee -a "$LOG_FILE"
 
 log "Installing dependencies..."
-npm ci --silent 2>&1 | tee -a "$LOG_FILE"
+npm install 2>&1 | tee -a "$LOG_FILE"
 
 log "Generating Prisma..."
 npx prisma generate 2>&1 | tee -a "$LOG_FILE"
