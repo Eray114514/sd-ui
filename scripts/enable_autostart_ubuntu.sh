@@ -39,7 +39,7 @@ Type=simple
 WorkingDirectory=$APP_DIR
 Environment=NODE_ENV=production
 Environment=DATABASE_URL=file:./dev.db
-ExecStart=/usr/bin/env bash -lc "cd $APP_DIR && mkdir -p $LOG_DIR && if [ -f .next/standalone/server.js ]; then node .next/standalone/server.js >> $LOG_OUT 2>> $LOG_ERR; elif [ -f .next/standalone/ui/server.js ]; then node .next/standalone/ui/server.js >> $LOG_OUT 2>> $LOG_ERR; else npm run start >> $LOG_OUT 2>> $LOG_ERR; fi"
+ExecStart=/bin/bash -c 'mkdir -p $LOG_DIR && if [ -f .next/standalone/server.js ]; then node .next/standalone/server.js >> $LOG_OUT 2>> $LOG_ERR; elif [ -f .next/standalone/ui/server.js ]; then node .next/standalone/ui/server.js >> $LOG_OUT 2>> $LOG_ERR; else npm run start; fi >> $LOG_OUT 2>> $LOG_ERR'
 Restart=on-failure
 RestartSec=3
 

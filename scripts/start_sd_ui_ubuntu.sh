@@ -17,4 +17,4 @@ else
 fi
 
 sleep 1
-systemctl --user status "$SERVICE_NAME" --no-pager
+systemctl --user status "$SERVICE_NAME" --no-pager || true
