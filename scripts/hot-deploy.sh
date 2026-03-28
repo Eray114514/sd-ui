@@ -6,12 +6,32 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="$REPO_DIR/ui"
 LOG_DIR="${HOME}/.local/share/sd-ui/logs"
 LOG_FILE="$LOG_DIR/hot-deploy.log"
+BACKUP_DIR="${HOME}/.local/share/sd-ui/backups"
 SHUTDOWN_TIMEOUT=30
 
 mkdir -p "$LOG_DIR"
+mkdir -p "$BACKUP_DIR"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+backup_database() {
+    DB_PATH="$APP_DIR/prisma/dev.db"
+    if [ -f "$DB_PATH" ]; then
+        BACKUP_NAME="dev.db.$(date '+%Y%m%d_%H%M%S').backup"
+        BACKUP_PATH="$BACKUP_DIR/$BACKUP_NAME"
+        cp "$DB_PATH" "$BACKUP_PATH"
+        log "Database backed up to: $BACKUP_PATH"
+        
+        local old_backups=($(ls -t "$BACKUP_DIR"/dev.db.*.backup 2>/dev/null || true))
+        if [ ${#old_backups[@]} -gt 5 ]; then
+            for ((i=5; i<${#old_backups[@]}; i++)); do
+                rm -f "${old_backups[$i]}"
+                log "Removed old backup: ${old_backups[$i]}"
+            done
+        fi
+    fi
 }
 
 wait_for_processing_tasks() {
@@ -50,11 +70,24 @@ log "Resetting to remote version..."
 git fetch origin
 git reset --hard origin/main 2>&1 | tee -a "$LOG_FILE"
 
+log "Backing up database..."
+backup_database
+
 log "Installing dependencies..."
 npm install 2>&1 | tee -a "$LOG_FILE"
 
-log "Generating Prisma..."
+log "Generating Prisma client..."
 npx prisma generate 2>&1 | tee -a "$LOG_FILE"
+
+log "Running database migrations..."
+if [ -d "$APP_DIR/prisma/migrations" ]; then
+    npx prisma migrate deploy 2>&1 | tee -a "$LOG_FILE" || {
+        log "Migration failed, attempting to resolve..."
+        npx prisma migrate resolve --applied 2>&1 | tee -a "$LOG_FILE" || true
+    }
+else
+    log "No migrations directory found, skipping migrate deploy"
+fi
 
 log "Building..."
 npm run build 2>&1 | tee -a "$LOG_FILE"

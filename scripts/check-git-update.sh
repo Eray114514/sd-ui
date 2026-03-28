@@ -48,11 +48,21 @@ echo "Changed files: $CHANGED_FILES" >> "$GIT_LOG"
 SCRIPTS_CHANGED=false
 FRONTEND_ONLY=false
 BACKEND_CHANGED=false
+DEPENDENCIES_CHANGED=false
+PRISMA_SCHEMA_CHANGED=false
 
 for file in $CHANGED_FILES; do
     case "$file" in
         scripts/*)
             SCRIPTS_CHANGED=true
+            ;;
+        ui/package.json|ui/package-lock.json|ui/yarn.lock|ui/pnpm-lock.yaml)
+            DEPENDENCIES_CHANGED=true
+            BACKEND_CHANGED=true
+            ;;
+        ui/prisma/schema.prisma)
+            PRISMA_SCHEMA_CHANGED=true
+            BACKEND_CHANGED=true
             ;;
         ui/src/app/api/*|ui/src/lib/*|ui/prisma/*|ui/src/services/*|ui/src/components/custom/*)
             BACKEND_CHANGED=true
@@ -66,6 +76,14 @@ for file in $CHANGED_FILES; do
             ;;
     esac
 done
+
+if [ "$PRISMA_SCHEMA_CHANGED" = true ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') Prisma schema changed, will run migrations" >> "$GIT_LOG"
+fi
+
+if [ "$DEPENDENCIES_CHANGED" = true ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') Dependencies changed, will run npm install" >> "$GIT_LOG"
+fi
 
 RELEVANT_CHANGE=false
 if [ "$SCRIPTS_CHANGED" = true ] || [ "$BACKEND_CHANGED" = true ] || [ "$FRONTEND_ONLY" = true ]; then
