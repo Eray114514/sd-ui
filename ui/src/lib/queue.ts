@@ -1,6 +1,6 @@
 import { prisma } from './db'
 import axios, { AxiosError } from 'axios'
-import fs from 'fs'
+import fs from 'fs/promises'
 import path from 'path'
 import { getDefaultImageDir, normalizeImageDir } from "./paths"
 import { SD_WEBUI_BASE_URL } from './sdConfig'
@@ -119,15 +119,17 @@ export async function processQueue() {
                 const config = await prisma.systemConfig.findUnique({ where: { id: 'default' } })
                 const imageDir = normalizeImageDir(config?.imageDir || getDefaultImageDir())
 
-                if (!fs.existsSync(imageDir)) {
-                    fs.mkdirSync(imageDir, { recursive: true })
+                try {
+                    await fs.access(imageDir)
+                } catch {
+                    await fs.mkdir(imageDir, { recursive: true })
                 }
 
                 const savedPaths: string[] = []
                 for (let i = 0; i < images.length; i++) {
                     const filename = `${Date.now()}_${task.id}_${i}.png`
                     const filepath = path.join(imageDir, filename)
-                    fs.writeFileSync(filepath, Buffer.from(images[i], 'base64'))
+                    await fs.writeFile(filepath, Buffer.from(images[i], 'base64'))
                     savedPaths.push(filepath)
                 }
 

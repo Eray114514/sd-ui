@@ -26,20 +26,6 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-cd "$APP_DIR"
-
-echo "Installing dependencies..."
-npm install
-
-echo "Generating Prisma client..."
-npx prisma generate
-
-echo "Initializing database..."
-npx prisma db push
-
-echo "Building application..."
-npm run build
-
 mkdir -p "$SYSTEMD_USER_DIR"
 
 cat > "$SERVICE_FILE" <<EOF
@@ -64,15 +50,13 @@ echo "Service written: $SERVICE_FILE"
 
 systemctl --user daemon-reload
 systemctl --user enable "$SERVICE_NAME" >/dev/null
-systemctl --user start "$SERVICE_NAME"
 
-echo "Service started. You can close this window."
+echo "Autostart enabled. The service will start at next boot."
 echo "Status: systemctl --user status $SERVICE_NAME"
 echo "Logs:"
 echo "  stdout: $LOG_OUT"
 echo "  stderr: $LOG_ERR"
 
-# Enable user linger so the service can start at boot even without an active login.
 if command -v loginctl >/dev/null 2>&1; then
   if ! loginctl show-user "$USER" -p Linger | grep -q "Linger=yes"; then
     echo "Enabling user linger (requires sudo)..."

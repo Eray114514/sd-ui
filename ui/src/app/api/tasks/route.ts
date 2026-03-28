@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import fs from 'fs'
+import fs from 'fs/promises'
 
 export async function GET() {
   const tasks = await prisma.task.findMany({
@@ -33,10 +33,12 @@ export async function DELETE(req: Request) {
       where: { taskId: id }
     })
 
-    // Delete files from disk
     for (const img of images) {
-      if (fs.existsSync(img.path)) {
-        fs.unlinkSync(img.path)
+      try {
+        await fs.access(img.path)
+        await fs.unlink(img.path)
+      } catch {
+        // File doesn't exist or can't be accessed, continue with next file
       }
     }
 

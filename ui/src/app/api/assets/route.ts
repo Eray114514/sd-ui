@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { apiCache, cacheKeys } from '@/lib/cache'
 import { ASSETS_PAGE_SIZE } from '@/lib/constants'
-import fs from 'fs'
+import fs from 'fs/promises'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -47,8 +47,13 @@ export async function DELETE(req: Request) {
   try {
     const image = await prisma.generatedImage.findUnique({ where: { id } })
 
-    if (image && fs.existsSync(image.path)) {
-      fs.unlinkSync(image.path)
+    if (image) {
+      try {
+        await fs.access(image.path)
+        await fs.unlink(image.path)
+      } catch {
+        // File doesn't exist or can't be accessed, continue with DB deletion
+      }
     }
 
     await prisma.generatedImage.delete({

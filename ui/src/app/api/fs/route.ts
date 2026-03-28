@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import fs from "fs"
+import fs from 'fs/promises'
+import fsSync from 'fs'
 import path from "path"
 
 type FsEntry = {
@@ -32,7 +33,7 @@ function isAbsolutePath(targetPath: string) {
   return path.posix.isAbsolute(targetPath)
 }
 
-function listRoots(): FsEntry[] {
+async function listRoots(): Promise<FsEntry[]> {
   if (!isWindows()) {
     return [{ name: "/", path: "/", type: "dir" }]
   }
@@ -41,8 +42,11 @@ function listRoots(): FsEntry[] {
   for (let i = 65; i <= 90; i++) {
     const drive = String.fromCharCode(i)
     const drivePath = `${drive}:\\`
-    if (fs.existsSync(drivePath)) {
+    try {
+      await fs.access(drivePath)
       entries.push({ name: drivePath, path: drivePath, type: "dir" })
+    } catch {
+      // Drive doesn't exist, skip it
     }
   }
   return entries
@@ -57,10 +61,11 @@ export async function GET(req: Request) {
   const requested = searchParams.get("path")
 
   if (!requested) {
+    const entries = await listRoots()
     return NextResponse.json({
       current: null,
       parent: null,
-      entries: listRoots(),
+      entries,
     })
   }
 
@@ -69,9 +74,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "路径必须是绝对路径。" }, { status: 400 })
   }
 
-  let stat: fs.Stats
+  let stat: fsSync.Stats
   try {
-    stat = fs.statSync(normalized)
+    stat = await fs.stat(normalized)
   } catch {
     return NextResponse.json({ error: "路径不存在。" }, { status: 404 })
   }
@@ -82,7 +87,7 @@ export async function GET(req: Request) {
 
   let entries: FsEntry[] = []
   try {
-    const dirents = fs.readdirSync(normalized, { withFileTypes: true })
+    const dirents = await fs.readdir(normalized, { withFileTypes: true })
     entries = dirents
       .filter((d) => d.isDirectory())
       .map((d) => ({
