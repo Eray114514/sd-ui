@@ -55,7 +55,7 @@ export function TaskList() {
         shouldScrollRef.current = false
       }
     } else if (tasks.length === 0 && !initialLoadRef.current) {
-      setIsInitialLoaded(true)
+      queueMicrotask(() => setIsInitialLoaded(true))
     }
   }, [tasks.length])
 
