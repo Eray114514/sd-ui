@@ -13,25 +13,35 @@ mkdir -p "$LOG_DIR"
 cd "$APP_DIR"
 
 LATEST_HASH_FILE="$LOG_DIR/.last_commit_hash"
-CURRENT_HASH=$(git rev-parse HEAD 2>/dev/null || echo "")
+ensure_scripts_executable() {
+    chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
+    chmod +x "$REPO_DIR"/scripts/*.sh 2>/dev/null || true
+}
 
-if [ -z "$CURRENT_HASH" ]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error: Not a git repository or no commits" >> "$GIT_LOG"
+git_reset_and_pull() {
+    git fetch origin
+    git reset --hard origin/main 2>&1 | tee -a "$GIT_LOG" || true
+    ensure_scripts_executable
+}
+
+git fetch origin
+REMOTE_HASH=$(git rev-parse origin/main 2>/dev/null || echo "")
+LOCAL_HASH=$(git rev-parse HEAD 2>/dev/null || echo "")
+
+if [ -z "$LOCAL_HASH" ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error: Not a git repository" >> "$GIT_LOG"
     exit 1
 fi
 
-if [ -f "$LATEST_HASH_FILE" ]; then
-    LAST_HASH=$(cat "$LATEST_HASH_FILE")
-    if [ "$CURRENT_HASH" = "$LAST_HASH" ]; then
-        exit 0
-    fi
+if [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
+    exit 0
 fi
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') Detected new commits, analyzing changes..." >> "$GIT_LOG"
-echo "$CURRENT_HASH" > "$LATEST_HASH_FILE"
+echo "$(date '+%Y-%m-%d %H:%M:%S') Detected new commits, pulling..." >> "$GIT_LOG"
+git_reset_and_pull
+echo "$REMOTE_HASH" > "$LATEST_HASH_FILE"
 
-git fetch origin
-CHANGED_FILES=$(git diff --name-only origin/main...HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+CHANGED_FILES=$(git diff --name-only "$LOCAL_HASH" "$REMOTE_HASH" 2>/dev/null || echo "")
 
 echo "Changed files: $CHANGED_FILES" >> "$GIT_LOG"
 
@@ -61,17 +71,6 @@ RELEVANT_CHANGE=false
 if [ "$SCRIPTS_CHANGED" = true ] || [ "$BACKEND_CHANGED" = true ] || [ "$FRONTEND_ONLY" = true ]; then
     RELEVANT_CHANGE=true
 fi
-
-ensure_scripts_executable() {
-    chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
-    chmod +x "$REPO_DIR"/scripts/*.sh 2>/dev/null || true
-}
-
-git_reset_and_pull() {
-    git fetch origin
-    git reset --hard origin/main 2>&1 | tee -a "$GIT_LOG" || true
-    ensure_scripts_executable
-}
 
 if [ "$RELEVANT_CHANGE" = false ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Only docs/config files changed, no action needed" >> "$GIT_LOG"
