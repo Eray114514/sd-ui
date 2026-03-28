@@ -53,13 +53,20 @@ for file in $CHANGED_FILES; do
     esac
 done
 
+git_reset_scripts() {
+    git checkout -- scripts/ 2>/dev/null || true
+}
+
 if [ "$SCRIPTS_CHANGED" = true ] && [ "$BACKEND_CHANGED" = false ] && [ "$FRONTEND_ONLY" = false ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Only scripts changed, no restart needed" >> "$GIT_LOG"
+    git_reset_scripts
     git pull origin main >> "$GIT_LOG" 2>&1
     chmod +x "$SCRIPT_DIR"/*.sh
     echo "$(date '+%Y-%m-%d %H:%M:%S') Scripts updated successfully" >> "$GIT_LOG"
 elif [ "$BACKEND_CHANGED" = true ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Backend/API changes detected, performing hot deployment..." >> "$GIT_LOG"
+    git_reset_scripts
+    git pull origin main >> "$GIT_LOG" 2>&1
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
         "$SCRIPT_DIR/hot-deploy.sh"
     else
@@ -68,6 +75,7 @@ elif [ "$BACKEND_CHANGED" = true ]; then
     fi
 elif [ "$FRONTEND_ONLY" = true ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Frontend only changes, rebuilding..." >> "$GIT_LOG"
+    git_reset_scripts
     git pull origin main >> "$GIT_LOG" 2>&1
     npm ci --silent >> "$GIT_LOG" 2>&1
     npx prisma generate >> "$GIT_LOG" 2>&1
@@ -82,6 +90,8 @@ elif [ "$FRONTEND_ONLY" = true ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Frontend rebuilt and synced successfully" >> "$GIT_LOG"
 else
     echo "$(date '+%Y-%m-%d %H:%M:%S') Generic update, performing hot deployment..." >> "$GIT_LOG"
+    git_reset_scripts
+    git pull origin main >> "$GIT_LOG" 2>&1
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
         "$SCRIPT_DIR/hot-deploy.sh"
     fi
