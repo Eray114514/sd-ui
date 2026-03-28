@@ -1,1 +1,3 @@
-export const SD_WEBUI_BASE_URL = process.env.SD_WEBUI_BASE_URL || "http://localhost:7860"
+import { env } from './env'
+
+export const SD_WEBUI_BASE_URL = env.SD_API_URL

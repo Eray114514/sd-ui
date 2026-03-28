@@ -4,8 +4,12 @@ import fs from 'fs/promises'
 import path from 'path'
 import { getDefaultImageDir, normalizeImageDir } from "./paths"
 import { SD_WEBUI_BASE_URL } from './sdConfig'
+import { SDApiError } from '@/errors'
+import { createLogger } from './logger'
 import http from 'http'
 import https from 'https'
+
+const logger = createLogger('queue')
 
 const MAX_RETRIES = 2
 
@@ -13,55 +17,53 @@ const globalForQueue = globalThis as unknown as {
     isProcessing: boolean
 }
 
-// 创建自定义 axios 实例，确保不会超时
 const sdApiClient = axios.create({
-    // 完全不设置 timeout，让请求永远等待
     httpAgent: new http.Agent({
         keepAlive: false,
         maxSockets: 1,
-        timeout: 0, // 连接超时设为0（无限制）
+        timeout: 0,
     }),
     httpsAgent: new https.Agent({
         keepAlive: false,
         maxSockets: 1,
         timeout: 0,
     }),
-    // 增加最大响应体大小
     maxContentLength: Infinity,
     maxBodyLength: Infinity,
 })
 
-// 添加请求拦截器记录日志
 sdApiClient.interceptors.request.use(
     (config) => {
-        console.log(`[SD API] 开始请求: ${config.method?.toUpperCase()} ${config.url}`)
+        logger.debug({ method: config.method?.toUpperCase(), url: config.url }, 'SD API request')
         return config
     },
     (error) => {
-        console.error('[SD API] 请求拦截器错误:', error)
+        logger.error({ error }, 'SD API request interceptor error')
         return Promise.reject(error)
     }
 )
 
-// 添加响应拦截器记录日志
 sdApiClient.interceptors.response.use(
     (response) => {
-        console.log(`[SD API] 请求完成: ${response.config.url} - 状态: ${response.status}`)
+        logger.debug({ url: response.config.url, status: response.status }, 'SD API response')
         return response
     },
     (error) => {
-        console.error('[SD API] 响应错误:', {
+        logger.error({
             url: error.config?.url,
             code: error.code,
             message: error.message,
-            response: error.response?.status,
-        })
+            status: error.response?.status,
+        }, 'SD API response error')
         return Promise.reject(error)
     }
 )
 
 export async function processQueue() {
-    if (globalForQueue.isProcessing) return
+    if (globalForQueue.isProcessing) {
+        logger.debug('Queue already processing, skipping')
+        return
+    }
     globalForQueue.isProcessing = true
 
     try {
@@ -72,10 +74,11 @@ export async function processQueue() {
             })
 
             if (!task) {
-                break // No more tasks
+                logger.debug('No pending tasks, exiting queue processor')
+                break
             }
 
-            console.log(`[Queue] 开始处理任务: ${task.id}`)
+            logger.info({ taskId: task.id }, 'Processing task')
             const startTime = Date.now()
 
             await prisma.task.update({
@@ -102,19 +105,25 @@ export async function processQueue() {
                     }
                 }
 
-                console.log(`[Queue] 调用 SD API，参数: steps=${payload.steps}, width=${payload.width}, height=${payload.height}, n_iter=${payload.n_iter}`)
+                logger.debug({
+                    taskId: task.id,
+                    steps: payload.steps,
+                    width: payload.width,
+                    height: payload.height,
+                    n_iter: payload.n_iter,
+                }, 'Calling SD API with parameters')
 
                 const response = await sdApiClient.post(`${SD_WEBUI_BASE_URL}/sdapi/v1/txt2img`, payload)
 
                 const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-                console.log(`[Queue] SD API 调用完成，耗时: ${elapsed} 秒`)
+                logger.info({ taskId: task.id, elapsed: `${elapsed}s` }, 'SD API call completed')
 
                 const images = response.data.images;
                 if (!images || images.length === 0) {
-                    throw new Error("No images returned from API");
+                    throw new SDApiError("No images returned from API", undefined, 'NO_IMAGES');
                 }
 
-                console.log(`[Queue] 收到 ${images.length} 张图片`)
+                logger.debug({ taskId: task.id, imageCount: images.length }, 'Received images')
 
                 const config = await prisma.systemConfig.findUnique({ where: { id: 'default' } })
                 const imageDir = normalizeImageDir(config?.imageDir || getDefaultImageDir())
@@ -123,6 +132,7 @@ export async function processQueue() {
                     await fs.access(imageDir)
                 } catch {
                     await fs.mkdir(imageDir, { recursive: true })
+                    logger.debug({ imageDir }, 'Created image directory')
                 }
 
                 const savedPaths: string[] = []
@@ -148,7 +158,7 @@ export async function processQueue() {
                     })
                 })
 
-                console.log(`[Queue] 任务完成: ${task.id}`)
+                logger.info({ taskId: task.id, imageCount: savedPaths.length }, 'Task completed')
 
             } catch (error: unknown) {
                 const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
@@ -160,7 +170,12 @@ export async function processQueue() {
                 const currentRetry = task.retryCount || 0
 
                 if (currentRetry < MAX_RETRIES) {
-                    console.log(`[Queue] 任务 ${task.id} 失败，正在进行第 ${currentRetry + 1}/${MAX_RETRIES} 次重试...`)
+                    logger.warn({
+                        taskId: task.id,
+                        retry: currentRetry + 1,
+                        maxRetries: MAX_RETRIES,
+                    }, 'Task failed, retrying')
+
                     await prisma.task.update({
                         where: { id: task.id },
                         data: {
@@ -203,14 +218,14 @@ export async function processQueue() {
 
                 const errorJson = JSON.stringify(detailedError, null, 2)
 
-                console.error(`[Queue] 任务失败: ${task.id}, 耗时: ${elapsed} 秒`, {
+                logger.error({
+                    taskId: task.id,
+                    elapsed: `${elapsed}s`,
                     url,
                     status,
                     code: axiosError.code,
                     message: axiosError.message,
-                    data,
-                    stack: axiosError.stack
-                })
+                }, 'Task failed')
 
                 await prisma.task.update({
                     where: { id: task.id },
@@ -220,5 +235,6 @@ export async function processQueue() {
         }
     } finally {
         globalForQueue.isProcessing = false
+        logger.debug('Queue processor finished')
     }
 }
