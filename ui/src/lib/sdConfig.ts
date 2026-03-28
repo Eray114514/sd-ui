@@ -1,1 +1,1 @@
-export const SD_WEBUI_BASE_URL = process.env.SD_WEBUI_BASE_URL || "http://192.168.2.200:7860"
+export const SD_WEBUI_BASE_URL = process.env.SD_WEBUI_BASE_URL || "http://localhost:7860"
