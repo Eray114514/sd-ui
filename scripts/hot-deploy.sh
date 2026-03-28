@@ -46,11 +46,6 @@ log "=== Starting hot deployment ==="
 
 cd "$APP_DIR"
 
-CURRENT_PORT=$(ss -tlnp 2>/dev/null | grep -oP '300[01]' | sort -u | head -1 || echo "3000")
-NEW_PORT=$([ "$CURRENT_PORT" = "3000" ] && echo "3001" || echo "3000")
-
-log "Current port: $CURRENT_PORT, deploying on port: $NEW_PORT"
-
 log "Pulling latest code..."
 git pull origin main 2>&1 | tee -a "$LOG_FILE"
 
@@ -63,44 +58,10 @@ npx prisma generate --silent 2>&1 | tee -a "$LOG_FILE"
 log "Building..."
 npm run build 2>&1 | tee -a "$LOG_FILE"
 
-log "Waiting for current processing tasks before switching..."
+log "Waiting for current processing tasks before restart..."
 wait_for_processing_tasks 0
 
-log "Starting new instance on port $NEW_PORT..."
+log "Restarting service..."
+systemctl --user restart sd-ui
 
-if [ -f .next/standalone/server.js ]; then
-    PORT=$NEW_PORT node .next/standalone/server.js -H 0.0.0.0 >> "$LOG_DIR/app-$NEW_PORT.log" 2>> "$LOG_DIR/error-$NEW_PORT.log" &
-elif [ -f .next/standalone/ui/server.js ]; then
-    PORT=$NEW_PORT node .next/standalone/ui/server.js -H 0.0.0.0 >> "$LOG_DIR/app-$NEW_PORT.log" 2>> "$LOG_DIR/error-$NEW_PORT.log" &
-else
-    log "ERROR: No standalone build found"
-    exit 1
-fi
-
-NEW_PID=$!
-log "New instance PID: $NEW_PID"
-
-sleep 5
-
-if kill -0 $NEW_PID 2>/dev/null; then
-    log "New instance started successfully, switching proxy..."
-
-    if [ -f "$REPO_DIR/scripts/nginx-dev.conf" ]; then
-        sudo nginx -s reload 2>&1 | tee -a "$LOG_FILE"
-    fi
-
-    sleep 2
-
-    OLD_PID=$(pgrep -f "node.*3000" 2>/dev/null | head -1 || true)
-    if [ -n "$OLD_PID" ] && [ "$OLD_PID" != "$NEW_PID" ]; then
-        log "Stopping old instance (PID: $OLD_PID)..."
-        kill $OLD_PID 2>/dev/null || true
-        sleep 2
-        kill -9 $OLD_PID 2>/dev/null || true
-    fi
-
-    log "=== Hot deployment complete ==="
-else
-    log "ERROR: New instance failed to start"
-    exit 1
-fi
+log "=== Hot deployment complete ==="
