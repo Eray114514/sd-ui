@@ -53,20 +53,25 @@ for file in $CHANGED_FILES; do
     esac
 done
 
-git_reset_scripts() {
-    git checkout -- scripts/ 2>/dev/null || true
+ensure_scripts_executable() {
+    chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
+    chmod +x "$REPO_DIR"/scripts/*.sh 2>/dev/null || true
+}
+
+git_reset_and_pull() {
+    git fetch origin
+    git reset --hard origin/main 2>&1 | tee -a "$GIT_LOG" || true
+    ensure_scripts_executable
 }
 
 if [ "$SCRIPTS_CHANGED" = true ] && [ "$BACKEND_CHANGED" = false ] && [ "$FRONTEND_ONLY" = false ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Only scripts changed, no restart needed" >> "$GIT_LOG"
-    git_reset_scripts
-    git pull origin main >> "$GIT_LOG" 2>&1
-    chmod +x "$SCRIPT_DIR"/*.sh
+    git_reset_and_pull
     echo "$(date '+%Y-%m-%d %H:%M:%S') Scripts updated successfully" >> "$GIT_LOG"
 elif [ "$BACKEND_CHANGED" = true ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Backend/API changes detected, performing hot deployment..." >> "$GIT_LOG"
-    git_reset_scripts
-    git pull origin main >> "$GIT_LOG" 2>&1
+    git_reset_and_pull
+    ensure_scripts_executable
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
         "$SCRIPT_DIR/hot-deploy.sh"
     else
@@ -75,8 +80,7 @@ elif [ "$BACKEND_CHANGED" = true ]; then
     fi
 elif [ "$FRONTEND_ONLY" = true ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Frontend only changes, rebuilding..." >> "$GIT_LOG"
-    git_reset_scripts
-    git pull origin main >> "$GIT_LOG" 2>&1
+    git_reset_and_pull
     npm ci --silent >> "$GIT_LOG" 2>&1
     npx prisma generate >> "$GIT_LOG" 2>&1
     npm run build >> "$GIT_LOG" 2>&1
@@ -90,8 +94,8 @@ elif [ "$FRONTEND_ONLY" = true ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Frontend rebuilt and synced successfully" >> "$GIT_LOG"
 else
     echo "$(date '+%Y-%m-%d %H:%M:%S') Generic update, performing hot deployment..." >> "$GIT_LOG"
-    git_reset_scripts
-    git pull origin main >> "$GIT_LOG" 2>&1
+    git_reset_and_pull
+    ensure_scripts_executable
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
         "$SCRIPT_DIR/hot-deploy.sh"
     fi
