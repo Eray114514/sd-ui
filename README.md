@@ -2,8 +2,8 @@
 
 一个基于 Next.js 15 构建的现代化 Stable Diffusion Web UI，提供直观的图像生成任务管理和参数配置功能。
 
-![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)
-![React](https://img.shields.io/badge/React-19-blue?style=flat-square&logo=react)
+![Next.js](https://img.shields.io/badge/Next.js-15.5-black?style=flat-square&logo=next.js)
+![React](https://img.shields.io/badge/React-19.2-blue?style=flat-square&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-4-38B2AC?style=flat-square&logo=tailwind-css)
 ![Prisma](https://img.shields.io/badge/Prisma-5.22-2D3748?style=flat-square&logo=prisma)
@@ -39,7 +39,8 @@
 - **无限滚动**：支持无限滚动加载更多图片
 
 ### ⚙️ 系统设置
-- **目录配置**：设置图片输出目录
+- **独立设置页面**：清晰的设置界面布局
+- **目录配置**：设置图片输出目录（支持可视化目录选择器）
 - **模型管理**：添加、删除和查看可用模型
 - **风格管理**：自定义和管理风格预设
 
@@ -47,7 +48,7 @@
 
 | 类别 | 技术 |
 |------|------|
-| **前端框架** | Next.js 15 + React 19 |
+| **前端框架** | Next.js 15.5 + React 19.2 |
 | **开发语言** | TypeScript 5 |
 | **样式方案** | Tailwind CSS 4 + shadcn/ui + @base-ui/react |
 | **状态管理** | Zustand 5（持久化存储） |
@@ -62,34 +63,42 @@
 sd-ui/
 ├── package.json              # 根目录依赖（Zustand）
 ├── README.md                  # 项目说明文档
+├── logs/                      # 日志目录
+│   └── app.log
 │
-└── ui/                       # 主项目目录
-    ├── package.json          # 项目依赖配置
-    ├── next.config.mjs       # Next.js 配置
-    ├── tsconfig.json         # TypeScript 配置
-    ├── tailwind.config.ts    # Tailwind CSS 配置
-    ├── postcss.config.mjs    # PostCSS 配置
-    ├── components.json       # shadcn/ui 组件配置
-    ├── eslint.config.mjs     # ESLint 配置
+├── scripts/                   # 启动脚本
+│   ├── start_windows.bat      # Windows 启动脚本
+│   ├── start_windows.ps1      # Windows PowerShell 脚本
+│   ├── start_sd_ui_ubuntu.sh  # Ubuntu 启动脚本
+│   └── enable_autostart_ubuntu.sh  # Ubuntu 开机自启配置
+│
+└── ui/                        # 主项目目录
+    ├── package.json           # 项目依赖配置
+    ├── next.config.mjs        # Next.js 配置
+    ├── tsconfig.json          # TypeScript 配置
+    ├── tailwind.config.ts     # Tailwind CSS 配置
+    ├── postcss.config.mjs     # PostCSS 配置
+    ├── components.json        # shadcn/ui 组件配置
+    ├── eslint.config.mjs      # ESLint 配置
     │
     ├── prisma/
-    │   ├── schema.prisma     # 数据库模型定义
-    │   └── dev.db            # SQLite 数据库文件
+    │   ├── schema.prisma      # 数据库模型定义
+    │   └── dev.db             # SQLite 数据库文件
     │
-    ├── public/               # 静态资源
+    ├── public/                # 静态资源
     │
-    ├── scripts/              # 工具脚本
-    │   ├── recover-images.js    # 图片恢复脚本
+    ├── scripts/               # 工具脚本
+    │   ├── recover-images.js  # 图片恢复脚本
     │   └── sync-standalone-static.mjs  # 静态资源同步脚本
     │
     └── src/
-        ├── app/              # Next.js App Router
-        │   ├── page.tsx      # 首页（任务列表 + 控制面板）
-        │   ├── layout.tsx    # 根布局
-        │   ├── globals.css   # 全局样式
+        ├── app/               # Next.js App Router
+        │   ├── page.tsx       # 首页（任务列表 + 控制面板）
+        │   ├── layout.tsx     # 根布局
+        │   ├── globals.css    # 全局样式
         │   │
-        │   ├── api/          # API 路由
-        │   │   ├── assets/   # 资产服务
+        │   ├── api/           # API 路由
+        │   │   ├── assets/    # 资产服务
         │   │   ├── fs/        # 文件系统操作
         │   │   ├── generate/  # 图像生成接口
         │   │   ├── image/     # 图片管理接口
@@ -99,45 +108,45 @@ sd-ui/
         │   │   ├── styles/    # 风格管理接口
         │   │   └── tasks/     # 任务管理接口
         │   │
-        │   └── assets/       # 资产画廊页面
+        │   ├── assets/        # 资产画廊页面
+        │   └── settings/      # 系统设置页面
         │
         ├── components/
-        │   ├── ui/           # shadcn/ui 基础组件
-        │   ├── custom/       # 自定义业务组件
+        │   ├── ui/            # shadcn/ui 基础组件
+        │   ├── custom/        # 自定义业务组件
         │   │   ├── ControlPanel.tsx      # 控制面板
         │   │   ├── TaskList.tsx          # 任务列表
         │   │   ├── TaskCard.tsx          # 任务卡片
         │   │   ├── ImageDetailModal.tsx  # 图片详情弹窗
-        │   │   ├── DirectoryPicker.tsx   # 目录选择器
-        │   │   └── SettingsDialog.tsx    # 设置对话框
-        │   ├── layout/       # 布局组件
+        │   │   └── DirectoryPicker.tsx   # 目录选择器
+        │   ├── layout/        # 布局组件
         │   │   ├── Sidebar.tsx       # 侧边栏导航
         │   │   └── MobileNav.tsx     # 移动端导航
         │   └── theme-provider.tsx  # 主题提供者
         │
-        ├── lib/
-        │   ├── db.ts         # Prisma 数据库客户端
-        │   ├── utils.ts      # 工具函数
-        │   ├── paths.ts      # 路径配置
-        │   ├── queue.ts      # 队列处理器（含重试逻辑）
-        │   ├── sdConfig.ts   # SD WebUI 配置
-        │   ├── cache.ts      # 缓存管理
-        │   ├── constants.ts  # 常量定义
+        ├── lib/               # 工具库
+        │   ├── db.ts          # Prisma 数据库客户端
+        │   ├── utils.ts       # 工具函数
+        │   ├── paths.ts       # 路径配置
+        │   ├── queue.ts       # 队列处理器（含重试逻辑）
+        │   ├── sdConfig.ts    # SD WebUI 配置
+        │   ├── cache.ts       # 缓存管理
+        │   ├── constants.ts   # 常量定义
         │   └── pollingManager.ts  # 轮询管理器
         │
-        ├── services/         # 服务层
+        ├── services/          # 服务层
         │   ├── apiClient.ts       # API 客户端封装
         │   ├── assetsService.ts   # 资产服务
         │   ├── generateService.ts # 生成服务
         │   ├── modelsService.ts   # 模型服务
         │   ├── progressService.ts # 进度服务
-        │   ├── stylesService.ts  # 风格服务
-        │   └── tasksService.ts   # 任务服务
+        │   ├── stylesService.ts   # 风格服务
+        │   └── tasksService.ts    # 任务服务
         │
         ├── store/
         │   └── generationStore.ts  # 生成参数状态管理（Zustand）
         │
-        ├── types/            # TypeScript 类型定义
+        ├── types/             # TypeScript 类型定义
         │   ├── index.ts           # 通用类型
         │   ├── api.ts             # API 类型
         │   └── generation.ts      # 生成参数类型
@@ -145,7 +154,7 @@ sd-ui/
         ├── constants/         # 常量配置
         │   └── index.ts           # UI 常量和配置
         │
-        └── errors/           # 错误处理
+        └── errors/            # 错误处理
             ├── index.ts           # 错误类型定义
             └── errorHandler.ts    # 错误处理器
 ```
@@ -158,7 +167,27 @@ sd-ui/
 - npm 或 yarn 包管理器
 - Stable Diffusion WebUI（需正常运行并启用 --api 参数）
 
-### 安装步骤
+### 一键启动
+
+**Windows:**
+```bash
+# 双击运行或在命令行执行
+scripts\start_windows.bat
+```
+
+**Ubuntu:**
+```bash
+chmod +x scripts/start_sd_ui_ubuntu.sh
+./scripts/start_sd_ui_ubuntu.sh
+```
+
+启动脚本会自动：
+1. 检查并安装依赖
+2. 生成 Prisma 客户端
+3. 初始化数据库
+4. 启动开发服务器并打开浏览器
+
+### 手动安装
 
 1. **克隆项目**
    ```bash
@@ -181,6 +210,7 @@ sd-ui/
 
 4. **初始化数据库**
    ```bash
+   npx prisma generate
    npx prisma db push
    ```
 
@@ -266,7 +296,7 @@ npm start
 | 方法 | 路径 | 描述 |
 |------|------|------|
 | GET | /api/settings | 获取系统配置 |
-| PUT | /api/settings | 更新系统配置 |
+| POST | /api/settings | 更新系统配置 |
 
 ## ⚙️ 配置说明
 
@@ -282,7 +312,7 @@ npm start
   cfg: 5,
   seed: -1,      // -1 表示随机种子
   batchSize: 4,
-  n_iter: 4
+  styles: ["Lasy", "NAI3起手-"]
 }
 ```
 
@@ -314,7 +344,7 @@ UI_CONSTANTS = {
 ## 🎨 界面预览
 
 ### 页面结构
-- **侧边栏**：固定左侧导航，包含生成、资产页面入口和设置
+- **侧边栏**：固定左侧导航，包含生成、资产、设置页面入口
 - **主区域**：任务列表或资产画廊
 - **控制面板**：底部悬浮，支持展开/收起
 
@@ -325,6 +355,11 @@ UI_CONSTANTS = {
 - 画幅比例快捷选择
 - 参数滑块调节（迭代步数、CFG、生成数量）
 - 生成按钮
+
+### 设置页面功能
+- 图片保存目录配置（支持可视化目录选择器）
+- 模型管理（添加/删除）
+- 风格预设管理（添加/删除）
 
 ### 资产画廊功能
 - 日期分组展示
@@ -366,10 +401,10 @@ npm run lint
 ## 📝 注意事项
 
 1. **SD WebUI 连接**：确保 Stable Diffusion WebUI 已启动并添加 `--api` 参数
-2. **图片存储**：默认图片保存目录为 `C:\Users\<用户>\Pictures\AI_Images`，可在设置中修改
+2. **图片存储**：默认图片保存目录可在设置页面配置
 3. **数据库**：使用 SQLite 便于部署，生产环境可考虑 PostgreSQL
 4. **缓存策略**：模型和风格列表有 5 分钟缓存，修改后需等待缓存过期或重启
-5. **网络配置**：SD WebUI 地址在 `src/lib/sdConfig.ts` 中配置
+5. **网络配置**：SD WebUI 地址在 `.env` 文件中配置
 
 ## 🤝 贡献指南
 
