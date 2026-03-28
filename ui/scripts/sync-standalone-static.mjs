@@ -31,12 +31,17 @@ if (!appDir) {
   }
 }
 
+let staticDest;
 if (!appDir) {
-  console.warn("standalone static sync skipped: unable to resolve standalone app directory");
-  process.exit(0);
+  if (existsSync(join(standaloneRoot, ".next", "static"))) {
+    console.log("standalone static already exists at .next/standalone/.next/static");
+    process.exit(0);
+  }
+  staticDest = join(standaloneRoot, ".next", "static");
+} else {
+  staticDest = join(standaloneRoot, appDir, ".next", "static");
 }
 
-const staticDest = join(standaloneRoot, appDir, ".next", "static");
 mkdirSync(staticDest, { recursive: true });
 cpSync(staticSrc, staticDest, { recursive: true, force: true });
 console.log(`standalone static synced to ${staticDest}`);
