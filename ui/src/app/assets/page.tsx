@@ -363,7 +363,7 @@ export default function AssetsPage() {
                       <img
                         src={`/api/image?path=${encodeURIComponent(img.path)}`}
                         alt={img.task.prompt}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        className="w-full h-full object-cover"
                         loading="lazy"
                       />
 
@@ -377,7 +377,7 @@ export default function AssetsPage() {
 
                       {!isBatchMode && (
                         <>
-                        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-3 z-10 pointer-events-none">
+                        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-3 z-10 pointer-events-none">
                           <div className="flex justify-end gap-2 pointer-events-auto">
                           <Button
                             variant="secondary"

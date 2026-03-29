@@ -219,12 +219,12 @@ export const TaskCard = memo(function TaskCard({ task, progressData, setSelected
               <img
                 src={`/api/image?path=${encodeURIComponent(img.path)}`}
                 alt="Generated"
-                className={`w-full h-auto block transition-all duration-700 ${loadedImages.has(img.id) ? 'opacity-100 scale-100' : 'opacity-0 scale-95 absolute inset-0'} group-hover:scale-105 relative z-0`}
+                className={`w-full h-auto block transition-all duration-700 ${loadedImages.has(img.id) ? 'opacity-100 scale-100' : 'opacity-0 scale-95 absolute inset-0'} relative z-0`}
                 loading="lazy"
                 decoding="async"
                 onLoad={() => handleImageLoad(img.id)}
               />
-              <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-2 z-20 pointer-events-none">
+              <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-start p-2 z-20 pointer-events-none">
                 <div className="flex justify-end gap-1.5 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                   <Button
                     variant="secondary"
