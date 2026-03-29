@@ -29,13 +29,13 @@ Linux (自动检测 + 部署)
 
 脚本会根据修改的文件类型自动选择最优部署策略：
 
-| 文件类型 | 示例 | 部署行为 |
-|---------|------|---------|
-| **Shell 脚本** | `scripts/*.sh` | 仅更新脚本，不重启服务 |
-| **前端代码** | `ui/src/*`, `*.css` | 重建 + 同步静态文件，**不重启** |
-| **后端/API** | `ui/src/app/api/*`, `ui/prisma/*` | 完整热部署，等待任务完成后重启 |
-| **依赖文件** | `package.json`, `yarn.lock` | 触发完整热部署 |
-| **文档/配置** | `README.md`, `*.yml` | 完全忽略，不执行任何操作 |
+| 文件类型         | 示例                                | 部署行为                |
+| ------------ | --------------------------------- | ------------------- |
+| **Shell 脚本** | `scripts/*.sh`                    | 仅更新脚本，不重启服务         |
+| **前端代码**     | `ui/src/*`, `*.css`               | 重建 + 同步静态文件，**不重启** |
+| **后端/API**   | `ui/src/app/api/*`, `ui/prisma/*` | 完整热部署，等待任务完成后重启     |
+| **依赖文件**     | `package.json`, `yarn.lock`       | 触发完整热部署             |
+| **文档/配置**    | `README.md`, `*.yml`              | 完全忽略，不执行任何操作        |
 
 ### 为什么这样设计？
 
@@ -48,12 +48,12 @@ Linux (自动检测 + 部署)
 
 ### 核心脚本
 
-| 脚本 | 位置 | 功能 |
-|------|------|------|
-| `check-git-update.sh` | `scripts/` | Cron 调用，检测更新并触发部署 |
-| `hot-deploy.sh` | `scripts/` | 完整热部署：备份→安装依赖→构建→重启 |
+| 脚本                           | 位置         | 功能                          |
+| ---------------------------- | ---------- | --------------------------- |
+| `check-git-update.sh`        | `scripts/` | Cron 调用，检测更新并触发部署           |
+| `hot-deploy.sh`              | `scripts/` | 完整热部署：备份→安装依赖→构建→重启         |
 | `sync-standalone-static.mjs` | `scripts/` | Next.js standalone 模式静态文件同步 |
-| `nginx-dev.conf` | `scripts/` | Nginx 反向代理配置（端口 3000→3001） |
+| `nginx-dev.conf`             | `scripts/` | Nginx 反向代理配置（端口 3000→3001）  |
 
 ### 目录结构
 
@@ -136,6 +136,7 @@ chmod +x .git/hooks/post-checkout .git/hooks/post-merge
 ```
 
 **重要**：Windows 不跟踪文件执行权限。首次 clone 后需要推送一次权限：
+
 ```bash
 # 仅 Windows 执行一次
 git update-index --chmod=+x scripts/*.sh
@@ -156,6 +157,7 @@ git add . && git commit -m "fix: adjust button colors" && git push
 ```
 
 Linux 响应：
+
 ```
 [2024-01-01 12:00:01] Detected new commits, pulling...
 [2024-01-01 12:00:02] Frontend only changes, rebuilding without restart...
@@ -171,6 +173,7 @@ git add . && git commit -m "feat: add batch task endpoint" && git push
 ```
 
 Linux 响应：
+
 ```
 [2024-01-01 12:05:01] Detected new commits, pulling...
 [2024-01-01 12:05:02] Backend/API changes detected, performing hot deployment...
@@ -193,6 +196,7 @@ git add . && git commit -m "enhance: add backup rotation" && git push
 ```
 
 Linux 响应：
+
 ```
 [2024-01-01 12:10:01] Detected new commits, pulling...
 [2024-01-01 12:10:02] Only scripts changed, no restart needed
@@ -201,7 +205,7 @@ Linux 响应：
 
 ## 热部署核心逻辑
 
-### wait_for_processing_tasks 函数
+### wait\_for\_processing\_tasks 函数
 
 图片生成等长时间任务需要等待完成才能安全重启：
 
@@ -301,10 +305,6 @@ sqlite3 ~/projects/sd-ui/ui/prisma/dev.db "SELECT * FROM Task WHERE status='proc
 ```
 
 ## 技术选型说明
-
-### 为什么用 SQLite 而不是 PostgreSQL？
-
-SD-UI 是单用户本地应用，SQLite 足够且零配置。Prisma 支持 SQLite，便于在不同环境间迁移。
 
 ### 为什么用 Nginx 而不是直接访问 3001？
 
