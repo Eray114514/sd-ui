@@ -342,6 +342,46 @@ if [ $build_exit_code -ne 0 ]; then
     fi
 fi
 
+sync_public_files() {
+    local standalone_dir="$APP_DIR/.next/standalone"
+    local public_src="$APP_DIR/public"
+    local public_dest=""
+
+    if [ ! -d "$standalone_dir" ]; then
+        log "Standalone directory not found, skipping public sync"
+        return
+    fi
+
+    if [ ! -d "$public_src" ]; then
+        log "Public directory not found, skipping public sync"
+        return
+    fi
+
+    if [ -f "$APP_DIR/package.json" ]; then
+        local app_name=$(node -p "require('$APP_DIR/package.json').name" 2>/dev/null || echo "")
+        if [ -n "$app_name" ] && [ -d "$standalone_dir/$app_name" ]; then
+            public_dest="$standalone_dir/$app_name/public"
+        fi
+    fi
+
+    if [ -z "$public_dest" ]; then
+        local subdirs=($(ls -d "$standalone_dir"/*/ 2>/dev/null || true))
+        if [ ${#subdirs[@]} -eq 1 ]; then
+            public_dest="${subdirs[0]}public"
+        elif [ -d "$standalone_dir/ui" ]; then
+            public_dest="$standalone_dir/ui/public"
+        else
+            public_dest="$standalone_dir/public"
+        fi
+    fi
+
+    mkdir -p "$public_dest"
+    cp -r "$public_src/"* "$public_dest/" 2>/dev/null || true
+    log "Public files synced to: $public_dest"
+}
+
+sync_public_files
+
 log "Waiting for current processing tasks before restart..."
 wait_for_processing_tasks 0
 

@@ -227,7 +227,7 @@ for file in $CHANGED_FILES; do
         ui/src/app/api/*|ui/src/lib/*|ui/prisma/*|ui/src/services/*|ui/src/components/custom/*)
             BACKEND_CHANGED=true
             ;;
-        ui/src/*|ui/*.css|ui/components.json)
+        ui/src/*|ui/*.css|ui/components.json|ui/public/*)
             FRONTEND_ONLY=true
             ;;
         *.md|README*|LICENSE|CONTRIBUTING*|.gitignore|.env*|*.yml|*.yaml)
@@ -274,9 +274,36 @@ elif [ "$FRONTEND_ONLY" = true ]; then
     npx prisma generate >> "$GIT_LOG" 2>&1
     npm run build >> "$GIT_LOG" 2>&1
 
-    if [ -f "$STATIC_SYNC" ]; then
+    if [ -f "$APP_DIR/scripts/sync-standalone-static.mjs" ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Syncing static files..." >> "$GIT_LOG"
-        node "$STATIC_SYNC" >> "$GIT_LOG" 2>&1 || true
+        node "$APP_DIR/scripts/sync-standalone-static.mjs" >> "$GIT_LOG" 2>&1 || true
+    fi
+
+    local standalone_dir="$APP_DIR/.next/standalone"
+    local public_src="$APP_DIR/public"
+    local public_dest=""
+
+    if [ -d "$standalone_dir" ] && [ -d "$public_src" ]; then
+        if [ -f "$APP_DIR/package.json" ]; then
+            local app_name=$(node -p "require('$APP_DIR/package.json').name" 2>/dev/null || echo "")
+            if [ -n "$app_name" ] && [ -d "$standalone_dir/$app_name" ]; then
+                public_dest="$standalone_dir/$app_name/public"
+            fi
+        fi
+
+        if [ -z "$public_dest" ]; then
+            if [ -d "$standalone_dir/ui" ]; then
+                public_dest="$standalone_dir/ui/public"
+            else
+                public_dest="$standalone_dir/public"
+            fi
+        fi
+
+        if [ -n "$public_dest" ]; then
+            mkdir -p "$public_dest"
+            cp -r "$public_src/"* "$public_dest/" 2>/dev/null || true
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public files synced" >> "$GIT_LOG"
+        fi
     fi
 
     systemctl --user restart sd-ui 2>/dev/null || true
