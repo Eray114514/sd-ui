@@ -177,20 +177,52 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected new commits, analyzing changes..."
 
 LOCAL_CHANGES=$(git status --porcelain 2>/dev/null || echo "")
 if [ -n "$LOCAL_CHANGES" ]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Local changes detected, stashing..." >> "$GIT_LOG"
-    git stash 2>&1 | tee -a "$GIT_LOG" || true
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Local changes detected, analyzing..." >> "$GIT_LOG"
+
+    HAS_STASH_CONTENT=false
+
+    if echo "$LOCAL_CHANGES" | grep -qE "package-lock\.json|yarn\.lock|pnpm-lock\.yaml"; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected lock file changes, discarding them..." >> "$GIT_LOG"
+        git checkout -- package-lock.json yarn.lock pnpm-lock.yaml 2>/dev/null || true
+        LOCAL_CHANGES=$(git status --porcelain 2>/dev/null || echo "")
+    fi
+
+    if [ -n "$LOCAL_CHANGES" ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Stashing remaining local changes..." >> "$GIT_LOG"
+        git stash 2>&1 | tee -a "$GIT_LOG" || true
+        HAS_STASH_CONTENT=true
+    fi
+
     PULL_RESULT=$(git pull origin main --ff-only 2>&1 || echo "FAILED")
     echo "$PULL_RESULT" >> "$GIT_LOG"
 
     if echo "$PULL_RESULT" | grep -q "FAILED"; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, restoring local changes..." >> "$GIT_LOG"
-        git stash pop 2>&1 | tee -a "$GIT_LOG" || true
+        if [ "$HAS_STASH_CONTENT" = true ]; then
+            git stash pop 2>&1 | tee -a "$GIT_LOG" || true
+        fi
         notify "error" "拉取失败" "无法从远程拉取更新，本地修改已恢复"
         exit 1
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restoring local changes..." >> "$GIT_LOG"
-    git stash pop 2>&1 | tee -a "$GIT_LOG" || true
+    if [ "$HAS_STASH_CONTENT" = true ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restoring local changes..." >> "$GIT_LOG"
+        git stash pop 2>&1 | tee -a "$GIT_LOG" || true
+
+        CONFLICTS=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
+        if [ -n "$CONFLICTS" ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected conflicts: $CONFLICTS" >> "$GIT_LOG"
+            git checkout --theirs . 2>/dev/null || true
+            git add -A 2>/dev/null || true
+
+            if echo "$CONFLICTS" | grep -qE "package-lock\.json|yarn\.lock|pnpm-lock\.yaml"; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Discarding conflicted lock files..." >> "$GIT_LOG"
+                git checkout origin/main -- package-lock.json yarn.lock pnpm-lock.yaml 2>/dev/null || true
+            fi
+        fi
+    fi
+
+    NEED_REBUILD=true
 else
     git pull origin main --ff-only 2>&1 | tee -a "$GIT_LOG" || {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset..." >> "$GIT_LOG"
@@ -210,6 +242,7 @@ FRONTEND_ONLY=false
 BACKEND_CHANGED=false
 DEPENDENCIES_CHANGED=false
 PRISMA_SCHEMA_CHANGED=false
+NEED_REBUILD=false
 
 for file in $CHANGED_FILES; do
     case "$file" in
