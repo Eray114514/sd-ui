@@ -312,9 +312,11 @@ sqlite3 ~/projects/sd-ui/ui/prisma/dev.db "SELECT * FROM Task WHERE status='proc
 - Nginx 处理静态文件和请求转发
 - 便于后续添加缓存、SSL 等
 
-### 为什么用 git reset --hard 而不是 git pull？
+### 为什么用 git pull 而不是 git reset --hard？
 
-确保每次都是干净的状态，避免合并冲突。但 git reset --hard 不触发 hooks，所以需要 post-merge 钩子处理权限。
+`git pull` 触发 `post-merge` 钩子，可以自动修复脚本权限。而 `git reset --hard` 不保证触发钩子，可能导致脚本权限丢失。
+
+`--ff-only` 确保只做快速前进，避免合并冲突。
 
 ## 扩展建议
 

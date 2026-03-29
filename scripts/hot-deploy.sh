@@ -66,9 +66,8 @@ log "=== Starting hot deployment ==="
 
 cd "$APP_DIR"
 
-log "Resetting to remote version..."
-git fetch origin
-git reset --hard origin/main 2>&1 | tee -a "$LOG_FILE"
+log "Pulling latest version..."
+git pull origin main --ff-only 2>&1 | tee -a "$LOG_FILE"
 
 log "Backing up database..."
 backup_database

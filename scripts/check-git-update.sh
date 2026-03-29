@@ -19,8 +19,7 @@ ensure_scripts_executable() {
 }
 
 git_reset_and_pull() {
-    git fetch origin
-    git reset --hard origin/main 2>&1 | tee -a "$GIT_LOG" || true
+    git pull origin main --ff-only 2>&1 | tee -a "$GIT_LOG" || true
     ensure_scripts_executable
 }
 
