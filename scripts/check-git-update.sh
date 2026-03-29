@@ -32,7 +32,9 @@ should_send_failure_notification() {
 notify() {
     local status="$1"
     local message="$2"
-    local details="${3:-}"
+    local commit_title="${3:-}"
+    local commit_body="${4:-}"
+    local changed_files="${5:-}"
 
     if [ "$status" = "error" ] && ! should_send_failure_notification; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Failure notification suppressed (already notified)" >> "$GIT_LOG"
@@ -40,7 +42,7 @@ notify() {
         return 0
     fi
 
-    send_deployment_notification "$status" "$message" "$details"
+    send_deployment_notification "$status" "$message" "$commit_title" "$commit_body" "$changed_files"
     save_status "$status"
 }
 
@@ -64,17 +66,58 @@ send_email() {
 send_deployment_notification() {
     local status="$1"
     local message="$2"
-    local details="${3:-}"
+    local commit_title="$3"
+    local commit_body="$4"
+    local changed_files="$5"
 
-    local color="#4CAF50"
+    local status_color="#10B981"
+    local status_bg="#ECFDF5"
     local status_text="成功"
+    local card_border="#374151"
 
     if [ "$status" = "error" ]; then
-        color="#f44336"
+        status_color="#EF4444"
+        status_bg="#FEF2F2"
         status_text="失败"
+        card_border="#7F1D1D"
     elif [ "$status" = "warning" ]; then
-        color="#FF9800"
-        status_text="警告"
+        status_color="#F59E0B"
+        status_bg="#FFFBEB"
+        card_border="#92400E"
+    fi
+
+    local files_html=""
+    if [ -n "$changed_files" ]; then
+        local files_list=""
+        for f in $changed_files; do
+            local file_icon="📄"
+            case "$f" in
+                *.sh) file_icon="🔧" ;;
+                *.tsx|*.ts) file_icon="⚛️" ;;
+                *.json) file_icon="📋" ;;
+                *.css|*.scss) file_icon="🎨" ;;
+                *.prisma) file_icon="🗃️" ;;
+                *.md) file_icon="📝" ;;
+                ui/public/*) file_icon="🖼️" ;;
+            esac
+            files_list="${files_list}<div style='display:flex;align-items:center;padding:8px 12px;background:#1F2937;border-radius:6px;margin-bottom:6px;font-family:ui-monospace,monospace;font-size:13px;'><span style='margin-right:10px;'>${file_icon}</span><span style='color:#E5E7EB;word-break:break-all;'>${f}</span></div>"
+        done
+        files_html="<div style='margin-top:20px;'>
+            <div style='font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;'>变更文件</div>
+            ${files_list}
+        </div>"
+    fi
+
+    local commit_html=""
+    if [ -n "$commit_title" ]; then
+        commit_html="<div style='margin-top:20px;'>
+            <div style='font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;'>Commit</div>
+            <div style='background:#1F2937;border-radius:8px;padding:16px;border-left:3px solid ${status_color};'>
+                <div style='font-size:15px;font-weight:600;color:#F3F4F6;margin-bottom:8px;'>${commit_title}</div>"
+        if [ -n "$commit_body" ]; then
+            commit_html="${commit_html}<div style='font-size:13px;color:#9CA3AF;line-height:1.6;white-space:pre-wrap;'>${commit_body}</div>"
+        fi
+        commit_html="${commit_html}</div></div>"
     fi
 
     local html_body='<!DOCTYPE html>
@@ -83,47 +126,56 @@ send_deployment_notification() {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <style>
+        body { margin: 0; padding: 0; background-color: #111827; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    </style>
 </head>
-<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px;">
+<body>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#111827;padding:30px 15px;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                <table width="560" cellpadding="0" cellspacing="0" style="background:#1F2937;border-radius:16px;overflow:hidden;border:1px solid #374151;max-width:560px;">
                     <tr>
-                        <td style="background-color:'"$color"';padding:20px;text-align:center;">
-                            <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:600;">SD-UI 部署通知</h1>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding:30px;">
+                        <td style="padding:28px 32px;border-bottom:1px solid #374151;">
                             <table width="100%" cellpadding="0" cellspacing="0">
                                 <tr>
-                                    <td style="padding:10px 0;border-bottom:1px solid #eee;">
-                                        <strong style="color:#666;font-size:14px;">状态</strong>
+                                    <td>
+                                        <div style="display:flex;align-items:center;">
+                                            <div style="width:40px;height:40px;background:linear-gradient(135deg,${status_color} 0%,$(echo $status_color | sed 's/#/%23/')99 100%);border-radius:10px;margin-right:14px;display:flex;align-items:center;justify-content:center;">
+                                                <span style="font-size:20px;">🚀</span>
+                                            </div>
+                                            <div>
+                                                <div style="font-size:18px;font-weight:700;color:#F9FAFB;">SD-UI</div>
+                                                <div style="font-size:12px;color:#6B7280;">自动部署系统</div>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td style="padding:10px 0;border-bottom:1px solid #eee;text-align:right;">
-                                        <span style="display:inline-block;padding:4px 12px;border-radius:4px;background-color:'"$color"';color:#ffffff;font-size:14px;font-weight:500;">'"$status_text"'</span>
+                                    <td align="right">
+                                        <span style="display:inline-block;padding:6px 14px;border-radius:20px;background:${status_bg};color:${status_color};font-size:13px;font-weight:600;">${status_text}</span>
                                     </td>
                                 </tr>
-                                <tr>
-                                    <td style="padding:10px 0;border-bottom:1px solid #eee;">
-                                        <strong style="color:#666;font-size:14px;">时间</strong>
-                                    </td>
-                                    <td style="padding:10px 0;border-bottom:1px solid #eee;text-align:right;color:#333;font-size:14px;">'"$(date '+%Y-%m-%d %H:%M:%S')"'</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding:10px 0;border-bottom:1px solid #eee;">
-                                        <strong style="color:#666;font-size:14px;">消息</strong>
-                                    </td>
-                                    <td style="padding:10px 0;border-bottom:1px solid #eee;text-align:right;color:#333;font-size:14px;">'"$message"'</td>
-                                </tr>
-                                '"$(if [ -n "$details" ]; then echo '<tr><td style="padding:10px 0;" colspan="2"><pre style="background-color:#f9f9f9;padding:15px;border-radius:4px;font-size:12px;overflow-x:auto;color:#333;line-height:1.5;">'"$details"'</pre></td></tr>'; fi)"'
                             </table>
                         </td>
                     </tr>
                     <tr>
-                        <td style="background-color:#fafafa;padding:15px;text-align:center;border-top:1px solid #eee;">
-                            <p style="margin:0;color:#999;font-size:12px;">此邮件由 SD-UI 自动部署系统发送</p>
+                        <td style="padding:28px 32px;">
+                            <div style="margin-bottom:20px;">
+                                <div style="font-size:13px;color:#6B7280;margin-bottom:6px;">消息</div>
+                                <div style="font-size:16px;color:#F3F4F6;font-weight:500;">${message}</div>
+                            </div>
+                            <div style="margin-bottom:20px;">
+                                <div style="font-size:13px;color:#6B7280;margin-bottom:6px;">时间</div>
+                                <div style="font-size:14px;color:#D1D5DB;">'"$(date '+%Y-%m-%d %H:%M:%S')"'</div>
+                            </div>
+                            '"$commit_html"'
+                            '"$files_html"'
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:20px 32px;background:#111827;border-top:1px solid #374151;">
+                            <div style="text-align:center;">
+                                <span style="font-size:12px;color:#4B5563;">此邮件由 SD-UI 自动部署系统发送</span>
+                            </div>
                         </td>
                     </tr>
                 </table>
@@ -151,7 +203,7 @@ LOCAL_HASH=$(git rev-parse HEAD 2>/dev/null || echo "")
 
 if [ -z "$LOCAL_HASH" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error: Not a git repository" >> "$GIT_LOG"
-    notify "error" "Git 仓库错误" "无法读取本地 Git 仓库"
+    notify "error" "Git 仓库错误" "" "" ""
     exit 1
 fi
 
@@ -169,7 +221,7 @@ if ! git rev-parse --verify --quiet HEAD@{u} 2>/dev/null; then
     }
     ensure_scripts_executable
     echo "$REMOTE_HASH" > "$LATEST_HASH_FILE"
-    notify "success" "首次部署完成" "已拉取并构建最新版本"
+    notify "success" "首次部署完成" "" "" ""
     exit 0
 fi
 
@@ -201,7 +253,7 @@ if [ -n "$LOCAL_CHANGES" ]; then
         if [ "$HAS_STASH_CONTENT" = true ]; then
             git stash pop 2>&1 | tee -a "$GIT_LOG" || true
         fi
-        notify "error" "拉取失败" "无法从远程拉取更新，本地修改已恢复"
+        notify "error" "拉取失败" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES"
         exit 1
     fi
 
@@ -227,7 +279,7 @@ else
     git pull origin main --ff-only 2>&1 | tee -a "$GIT_LOG" || {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset..." >> "$GIT_LOG"
         git reset --hard origin/main 2>&1 | tee -a "$GIT_LOG" || true
-        notify "warning" "强制同步" "使用硬重置同步到远程版本"
+        notify "warning" "强制同步" "" "" ""
     }
 fi
 
@@ -236,6 +288,14 @@ echo "$REMOTE_HASH" > "$LATEST_HASH_FILE"
 
 CHANGED_FILES=$(git diff --name-only "$LOCAL_HASH" "$REMOTE_HASH" 2>/dev/null || echo "")
 echo "Changed files: $CHANGED_FILES" >> "$GIT_LOG"
+
+COMMIT_TITLE=$(git log --format="%s" "$LOCAL_HASH".."$REMOTE_HASH" 2>/dev/null | head -1 || echo "")
+COMMIT_BODY=$(git log --format="%b" "$LOCAL_HASH".."$REMOTE_HASH" 2>/dev/null | head -1 || echo "")
+COMMIT_COUNT=$(git rev-list --count "$LOCAL_HASH".."$REMOTE_HASH" 2>/dev/null || echo "1")
+
+if [ -n "$COMMIT_TITLE" ]; then
+    echo "Latest commit: $COMMIT_TITLE" >> "$GIT_LOG"
+fi
 
 SCRIPTS_CHANGED=false
 FRONTEND_ONLY=false
@@ -290,14 +350,14 @@ fi
 
 if [ "$SCRIPTS_CHANGED" = true ] && [ "$BACKEND_CHANGED" = false ] && [ "$FRONTEND_ONLY" = false ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Only scripts changed, no restart needed" >> "$GIT_LOG"
-    notify "success" "脚本已更新" "检测到脚本更新，已自动更新"
+    notify "success" "脚本已更新" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES"
 elif [ "$BACKEND_CHANGED" = true ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backend/API changes detected, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
         "$SCRIPT_DIR/hot-deploy.sh"
     else
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] hot-deploy.sh not found or not executable" >> "$GIT_LOG"
-        notify "error" "部署脚本错误" "hot-deploy.sh 未找到或无执行权限"
+        notify "error" "部署脚本错误" "" "" ""
         exit 1
     fi
 elif [ "$FRONTEND_ONLY" = true ]; then
@@ -341,7 +401,7 @@ elif [ "$FRONTEND_ONLY" = true ]; then
 
     systemctl --user restart sd-ui 2>/dev/null || true
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend rebuilt successfully (no restart - Next.js hot reload handles it)" >> "$GIT_LOG"
-    notify "success" "前端更新完成" "前端代码已更新并构建，服务持续运行"
+    notify "success" "前端更新完成" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES"
 else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generic update, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
