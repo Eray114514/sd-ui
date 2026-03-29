@@ -60,27 +60,16 @@ send_email() {
     local subject="$1"
     local html_body="$2"
 
-    local response
-    response=$(curl -s -w "\n%{http_code}" -X POST "https://api.resend.com/emails" \
-        -H "Authorization: Bearer $RESEND_API_KEY" \
-        -H "Content-Type: application/json" \
-        -d "$(jq -n \
-            --arg from "$EMAIL_FROM" \
-            --argjson to "$(echo "$EMAIL_TO" | jq -R '.' | jq -s '.')" \
-            --arg subject "$subject" \
-            --arg html "$html_body" \
-            '{from: $from, to: $to, subject: $subject, html: $html}')" 2>&1)
+    local tmp_file="/tmp/sd_ui_email_$(date +%s).html"
+    echo "$html_body" > "$tmp_file"
 
-    local http_code="${response##*$'\n'}"
-    local body="${response%$'\n'*}"
-    local error_msg=$(echo "$body" | jq -r '.message // .error // .name // empty' 2>/dev/null)
-
-    if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
+    if python3 "$SCRIPT_DIR/send_email.py" "$subject" "$tmp_file" >> "$LOG_FILE" 2>&1; then
         log "Email sent: $subject"
     else
-        log "Email failed (HTTP $http_code): $error_msg"
-        log "Response: $body"
+        log "Email failed: $subject"
     fi
+
+    rm -f "$tmp_file"
 }
 
 send_deployment_notification() {
