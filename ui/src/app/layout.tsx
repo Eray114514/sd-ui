@@ -11,6 +11,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Private AI Image Generator",
   description: "WebUI Forge Client",
+  icons: {
+    icon: "/palette.svg",
+  },
 };
 
 export default function RootLayout({
