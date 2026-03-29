@@ -12,6 +12,12 @@ SHUTDOWN_TIMEOUT=30
 mkdir -p "$LOG_DIR"
 mkdir -p "$BACKUP_DIR"
 
+if [ -f "$APP_DIR/.env" ]; then
+    set -a
+    source "$APP_DIR/.env"
+    set +a
+fi
+
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
@@ -380,7 +386,47 @@ sync_public_files() {
     log "Public files synced to: $public_dest"
 }
 
+commit_lock_file() {
+    local lock_file=""
+    if [ -f "$APP_DIR/package-lock.json" ]; then
+        lock_file="package-lock.json"
+    elif [ -f "$APP_DIR/yarn.lock" ]; then
+        lock_file="yarn.lock"
+    elif [ -f "$APP_DIR/pnpm-lock.yaml" ]; then
+        lock_file="pnpm-lock.yaml"
+    fi
+
+    if [ -z "$lock_file" ]; then
+        log "No lock file found, skipping commit"
+        return
+    fi
+
+    if git diff --quiet "$lock_file" 2>/dev/null; then
+        log "Lock file unchanged, skipping commit"
+        return
+    fi
+
+    log "Lock file changed, committing and pushing..."
+    git add "$lock_file"
+    git commit -m "chore(deps): update lock file
+
+Updated by hot-deploy.sh" >> "$LOG_FILE" 2>&1 || {
+        log "Failed to commit lock file"
+        return
+    }
+
+    git push origin main >> "$LOG_FILE" 2>&1 || {
+        log "Failed to push lock file, will retry next deployment"
+        git reset --soft HEAD~1 2>/dev/null || true
+        return
+    }
+
+    log "Lock file committed and pushed successfully"
+}
+
 sync_public_files
+
+commit_lock_file
 
 log "Waiting for current processing tasks before restart..."
 wait_for_processing_tasks 0

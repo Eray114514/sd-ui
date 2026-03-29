@@ -10,6 +10,17 @@ STATIC_SYNC="$SCRIPT_DIR/sync-standalone-static.mjs"
 
 mkdir -p "$LOG_DIR"
 
+if [ -f "$APP_DIR/.env" ]; then
+    set -a
+    source "$APP_DIR/.env"
+    set +a
+fi
+
+if [ -z "${RESEND_API_KEY:-}" ] || [ -z "${EMAIL_FROM:-}" ] || [ -z "${EMAIL_TO:-}" ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error: Missing environment variables (RESEND_API_KEY, EMAIL_FROM, EMAIL_TO)" >> "$GIT_LOG"
+    exit 1
+fi
+
 LAST_STATUS_FILE="$LOG_DIR/.last_deploy_status"
 
 get_last_status() {
@@ -232,15 +243,10 @@ if [ -n "$LOCAL_CHANGES" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Local changes detected, analyzing..." >> "$GIT_LOG"
 
     HAS_STASH_CONTENT=false
-
-    if echo "$LOCAL_CHANGES" | grep -qE "package-lock\.json|yarn\.lock|pnpm-lock\.yaml"; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected lock file changes, discarding them..." >> "$GIT_LOG"
-        git checkout -- package-lock.json yarn.lock pnpm-lock.yaml 2>/dev/null || true
-        LOCAL_CHANGES=$(git status --porcelain 2>/dev/null || echo "")
-    fi
+    NEED_REBUILD=true
 
     if [ -n "$LOCAL_CHANGES" ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Stashing remaining local changes..." >> "$GIT_LOG"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Stashing local changes..." >> "$GIT_LOG"
         git stash 2>&1 | tee -a "$GIT_LOG" || true
         HAS_STASH_CONTENT=true
     fi
@@ -266,15 +272,8 @@ if [ -n "$LOCAL_CHANGES" ]; then
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected conflicts: $CONFLICTS" >> "$GIT_LOG"
             git checkout --theirs . 2>/dev/null || true
             git add -A 2>/dev/null || true
-
-            if echo "$CONFLICTS" | grep -qE "package-lock\.json|yarn\.lock|pnpm-lock\.yaml"; then
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Discarding conflicted lock files..." >> "$GIT_LOG"
-                git checkout origin/main -- package-lock.json yarn.lock pnpm-lock.yaml 2>/dev/null || true
-            fi
         fi
     fi
-
-    NEED_REBUILD=true
 else
     git pull origin main --ff-only 2>&1 | tee -a "$GIT_LOG" || {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset..." >> "$GIT_LOG"
