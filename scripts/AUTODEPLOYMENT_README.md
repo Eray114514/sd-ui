@@ -52,6 +52,7 @@ Linux (自动检测 + 部署)
 | ---------------------------- | ---------- | --------------------------- |
 | `check-git-update.sh`        | `scripts/` | Cron 调用，检测更新并触发部署           |
 | `hot-deploy.sh`              | `scripts/` | 完整热部署：备份→安装依赖→构建→重启         |
+| `send_email.py`              | `scripts/` | Python 发邮件脚本，通过 Resend API 发送通知 |
 | `sync-standalone-static.mjs` | `scripts/` | Next.js standalone 模式静态文件同步 |
 | `nginx-dev.conf`             | `scripts/` | Nginx 反向代理配置（端口 3000→3001）  |
 
@@ -247,6 +248,28 @@ wait_for_processing_tasks() {
 
 部署完成后会自动发送 HTML 邮件通知，支持状态显示、详情展示，且针对 QQ 邮箱进行了兼容性优化。
 
+### 核心组件
+
+| 文件 | 功能 |
+|------|------|
+| `send_email.py` | Python 发邮件脚本，使用标准库 `urllib`，无需额外依赖 |
+| `check-git-update.sh` | 调用 Python 发送更新通知 |
+| `hot-deploy.sh` | 调用 Python 发送部署结果通知 |
+
+### 工作流程
+
+```
+Shell 脚本 → 构造 HTML → 写入临时文件 → 调用 Python → Python 读取文件 → API 发送邮件
+```
+
+### Python 依赖
+
+`send_email.py` 使用 Python 标准库（`urllib`、`json`），**无需安装额外依赖**。确保 Linux 上有 Python 3：
+
+```bash
+python3 --version
+```
+
 ### 通知触发条件
 
 | 事件 | 发送通知 | 冷却机制 |
@@ -266,22 +289,16 @@ HTML 邮件包含：
 
 ### 邮件配置
 
-**重要**：请在 Linux 服务器上设置环境变量，脚本不再硬编码敏感信息：
+**重要**：请在 Linux 服务器上创建 `ui/.env` 文件，脚本会自动加载：
 
 ```bash
-# 在 ~/.bashrc 或 systemd 服务文件中设置
-export RESEND_API_KEY="<YOUR_RESEND_API_KEY>"      # Resend API Key
-export EMAIL_FROM="<YOUR_EMAIL_FROM>"              # 发件邮箱
-export EMAIL_TO="<YOUR_EMAIL_TO>"                    # 收件邮箱
+# 创建 /home/<USER>/projects/sd-ui/ui/.env
+RESEND_API_KEY="<YOUR_RESEND_API_KEY>"      # Resend API Key
+EMAIL_FROM="<YOUR_EMAIL_FROM>"              # 发件邮箱
+EMAIL_TO="<YOUR_EMAIL_TO>"                    # 收件邮箱
 ```
 
-或在 systemd 服务文件中配置（`~/.config/systemd/user/sd-ui.service`）：
-```ini
-[Service]
-Environment="RESEND_API_KEY=<YOUR_RESEND_API_KEY>"
-Environment="EMAIL_FROM=<YOUR_EMAIL_FROM>"
-Environment="EMAIL_TO=<YOUR_EMAIL_TO>"
-```
+脚本启动时会自动 source 此文件加载环境变量。
 
 ### 防邮件轰炸机制
 
