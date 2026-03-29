@@ -60,17 +60,27 @@ send_email() {
     local subject="$1"
     local html_body="$2"
 
-    curl -s -X POST "https://api.resend.com/emails" \
+    local response
+    response=$(curl -s -w "\n%{http_code}" -X POST "https://api.resend.com/emails" \
         -H "Authorization: Bearer $RESEND_API_KEY" \
         -H "Content-Type: application/json" \
-        -d "{
-            \"from\": \"$EMAIL_FROM\",
-            \"to\": [\"$EMAIL_TO\"],
-            \"subject\": \"$subject\",
-            \"html\": \"$html_body\"
-        }" >> "$LOG_FILE" 2>&1
+        -d "$(jq -n \
+            --arg from "$EMAIL_FROM" \
+            --argjson to "$(echo "$EMAIL_TO" | jq -R '.' | jq -s '.')" \
+            --arg subject "$subject" \
+            --arg html "$html_body" \
+            '{from: $from, to: $to, subject: $subject, html: $html}')" 2>&1)
 
-    log "Email sent: $subject"
+    local http_code="${response##*$'\n'}"
+    local body="${response%$'\n'*}"
+    local error_msg=$(echo "$body" | jq -r '.message // .error // .name // empty' 2>/dev/null)
+
+    if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
+        log "Email sent: $subject"
+    else
+        log "Email failed (HTTP $http_code): $error_msg"
+        log "Response: $body"
+    fi
 }
 
 send_deployment_notification() {
