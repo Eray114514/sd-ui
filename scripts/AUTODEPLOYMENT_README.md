@@ -102,7 +102,7 @@ cd ui && npm run build
 # 配置 Cron（每分钟检测更新）
 crontab -e
 # 添加：
-* * * * * /home/eray/projects/sd-ui/scripts/check-git-update.sh >> /home/eray/.local/share/sd-ui/logs/cron.log 2>&1
+* * * * * /home/<YOUR_USER>/projects/sd-ui/scripts/check-git-update.sh >> /home/<YOUR_USER>/.local/share/sd-ui/logs/cron.log 2>&1
 ```
 
 ### 2. systemd 用户服务
@@ -127,7 +127,7 @@ cd ~/projects/sd-ui
 cat > .git/hooks/post-checkout << 'EOF'
 #!/bin/bash
 if [ "$(uname)" = "Linux" ]; then
-    chmod +x ~/projects/sd-ui/scripts/*.sh 2>/dev/null || true
+    chmod +x /home/<YOUR_USER>/projects/sd-ui/scripts/*.sh 2>/dev/null || true
 fi
 EOF
 
@@ -270,17 +270,17 @@ HTML 邮件包含：
 
 ```bash
 # 在 ~/.bashrc 或 systemd 服务文件中设置
-export RESEND_API_KEY="re_xxxxx"      # Resend API Key
-export EMAIL_FROM="copaw@eray.top"    # 发件邮箱
-export EMAIL_TO="285043939@qq.com"    # 收件邮箱
+export RESEND_API_KEY="<YOUR_RESEND_API_KEY>"      # Resend API Key
+export EMAIL_FROM="<YOUR_EMAIL_FROM>"              # 发件邮箱
+export EMAIL_TO="<YOUR_EMAIL_TO>"                    # 收件邮箱
 ```
 
 或在 systemd 服务文件中配置（`~/.config/systemd/user/sd-ui.service`）：
 ```ini
 [Service]
-Environment="RESEND_API_KEY=re_xxxxx"
-Environment="EMAIL_FROM=copaw@eray.top"
-Environment="EMAIL_TO=285043939@qq.com"
+Environment="RESEND_API_KEY=<YOUR_RESEND_API_KEY>"
+Environment="EMAIL_FROM=<YOUR_EMAIL_FROM>"
+Environment="EMAIL_TO=<YOUR_EMAIL_TO>"
 ```
 
 ### 防邮件轰炸机制
@@ -390,7 +390,7 @@ git push
 crontab -l
 
 # 手动测试
-/home/eray/projects/sd-ui/scripts/check-git-update.sh
+/home/<YOUR_USER>/projects/sd-ui/scripts/check-git-update.sh
 
 # 检查 cron 服务
 systemctl --user status cron
@@ -401,7 +401,7 @@ systemctl --user status cron
 检查是否有任务一直处于 processing 状态：
 
 ```bash
-sqlite3 ~/projects/sd-ui/ui/prisma/dev.db "SELECT * FROM Task WHERE status='processing';"
+sqlite3 /home/<YOUR_USER>/projects/sd-ui/ui/prisma/dev.db "SELECT * FROM Task WHERE status='processing';"
 ```
 
 ## 技术选型说明
