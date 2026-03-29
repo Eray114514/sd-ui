@@ -243,6 +243,97 @@ wait_for_processing_tasks() {
 - 保留数量：最近 5 个备份
 - 备份格式：`dev.db.20240101_120000.backup`
 
+## 邮件通知系统
+
+部署完成后会自动发送 HTML 邮件通知，支持状态显示、详情展示，且针对 QQ 邮箱进行了兼容性优化。
+
+### 通知触发条件
+
+| 事件 | 发送通知 | 冷却机制 |
+|------|---------|---------|
+| 部署成功 | ✅ | 成功后清除错误计数 |
+| 部署失败 | ✅ | 连续 3 次失败后抑制 |
+| 拉取失败 | ✅ | 有冷却期 |
+| 仅脚本更新 | ✅ | 成功后通知 |
+
+### 邮件内容示例
+
+HTML 邮件包含：
+- 状态标签（成功/失败/警告）
+- 时间戳
+- 操作消息
+- 详细日志（可选）
+
+### 邮件配置
+
+可通过环境变量自定义：
+
+```bash
+export RESEND_API_KEY="re_xxxxx"      # Resend API Key
+export EMAIL_FROM="copaw@eray.top"    # 发件邮箱
+export EMAIL_TO="285043939@qq.com"    # 收件邮箱
+```
+
+### 防邮件轰炸机制
+
+- **冷却期**：同一类型邮件发送后 1 小时内不重复发送
+- **错误计数**：连续失败 3 次后才发送错误通知，第 4+ 次不发送
+- **成功清除**：部署成功后自动清除错误计数
+
+## 自动处理本地修改
+
+如果 Linux 本地有未提交的修改（暂存或未暂存），系统会自动：
+
+1. 检测本地修改
+2. `git stash` 暂存本地修改
+3. 执行 `git pull`
+4. 尝试还原本地修改（`git stash pop`）
+5. 如拉取失败，本地修改会被恢复
+
+这确保了：
+- Linux 上的调试修改不会被覆盖
+- 多设备使用时不会丢失本地更改
+
+## 自动技术栈升级
+
+`hot-deploy.sh` 内置智能检测和修复机制：
+
+### Node.js 自动安装
+
+如果未检测到 Node.js，自动安装：
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt-get install -y nodejs
+```
+
+### npm 依赖重试
+
+`npm install` 失败后自动重试：
+1. 第一次失败 → 删除 `package-lock.json` 后重试
+2. 第二次失败 → 报告错误
+
+### Prisma 版本自动修复
+
+自动检测 `package.json` 中的 Prisma 版本：
+```bash
+# 检测版本
+npm install prisma@"$prisma_version" @prisma/client@"$prisma_version"
+npx prisma generate
+```
+
+### Prisma 生成失败修复
+
+`prisma generate` 失败后：
+1. 删除缓存的 Prisma client
+2. 重新生成
+
+### 构建失败智能修复
+
+构建失败后检测 "Module not found" 错误：
+1. 删除 `node_modules`
+2. 重新安装依赖
+3. 重新构建
+
 ## 日志查看
 
 ```bash
@@ -320,21 +411,17 @@ sqlite3 ~/projects/sd-ui/ui/prisma/dev.db "SELECT * FROM Task WHERE status='proc
 
 ## 扩展建议
 
-### 1. 添加 Slack/Discord 通知
+### 1. 添加更多通知渠道
 
-在 `hot-deploy.sh` 部署成功后发送通知：
+系统已内置邮件通知。可类似添加 Slack/Discord/钉钉等：
 
 ```bash
 curl -X POST "$WEBHOOK_URL" \
     -H 'Content-Type: application/json' \
-    -d '{"text": "Deployment completed successfully"}'
+    -d '{"text": "Deployment completed"}'
 ```
 
-### 2. 添加钉钉/企业微信群通知
-
-类似地调用 webhook API。
-
-### 3. 添加健康检查
+### 2. 健康检查
 
 部署后验证服务是否正常：
 
@@ -342,11 +429,11 @@ curl -X POST "$WEBHOOK_URL" \
 curl -f http://localhost:3001/api/health || exit 1
 ```
 
-### 4. 添加灰度发布
+### 3. 灰度发布
 
 通过环境变量控制流量比例，先将小部分流量引到新版本。
 
-### 5. 添加回滚机制
+### 4. 回滚机制
 
 保存最近 N 个版本的构建产物，出问题时快速回滚：
 
