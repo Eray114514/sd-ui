@@ -266,19 +266,28 @@ HTML 邮件包含：
 
 ### 邮件配置
 
-可通过环境变量自定义：
+**重要**：请在 Linux 服务器上设置环境变量，脚本不再硬编码敏感信息：
 
 ```bash
+# 在 ~/.bashrc 或 systemd 服务文件中设置
 export RESEND_API_KEY="re_xxxxx"      # Resend API Key
 export EMAIL_FROM="copaw@eray.top"    # 发件邮箱
 export EMAIL_TO="285043939@qq.com"    # 收件邮箱
 ```
 
+或在 systemd 服务文件中配置（`~/.config/systemd/user/sd-ui.service`）：
+```ini
+[Service]
+Environment="RESEND_API_KEY=re_xxxxx"
+Environment="EMAIL_FROM=copaw@eray.top"
+Environment="EMAIL_TO=285043939@qq.com"
+```
+
 ### 防邮件轰炸机制
 
-- **冷却期**：同一类型邮件发送后 1 小时内不重复发送
-- **错误计数**：连续失败 3 次后才发送错误通知，第 4+ 次不发送
-- **成功清除**：部署成功后自动清除错误计数
+- **失败只发一次**：部署失败时发送通知，后续失败不再发送
+- **成功重置**：部署成功后，下次失败会重新发送
+- 连续失败期间不会重复打扰，直到你解决问题并成功部署一次
 
 ## 自动处理本地修改
 

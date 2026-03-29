@@ -7,54 +7,48 @@ APP_DIR="$REPO_DIR/ui"
 LOG_DIR="${HOME}/.local/share/sd-ui/logs"
 GIT_LOG="$LOG_DIR/git-pull.log"
 STATIC_SYNC="$SCRIPT_DIR/sync-standalone-static.mjs"
-EMAIL_COOLDOWN_FILE="$LOG_DIR/.email_cooldown"
 
 mkdir -p "$LOG_DIR"
 
-RESEND_API_KEY="${RESEND_API_KEY:-re_EiFsWXvy_Ka5uqyxS58mAB3UicJfRt4Kv}"
-EMAIL_FROM="${EMAIL_FROM:-copaw@eray.top}"
-EMAIL_TO="${EMAIL_TO:-285043939@qq.com}"
+LAST_STATUS_FILE="$LOG_DIR/.last_deploy_status"
+
+get_last_status() {
+    if [ -f "$LAST_STATUS_FILE" ]; then
+        cat "$LAST_STATUS_FILE"
+    else
+        echo "unknown"
+    fi
+}
+
+save_status() {
+    echo "$1" > "$LAST_STATUS_FILE"
+}
+
+should_send_failure_notification() {
+    local last_status=$(get_last_status)
+    [ "$last_status" != "failed" ]
+}
+
+notify() {
+    local status="$1"
+    local message="$2"
+    local details="${3:-}"
+
+    if [ "$status" = "error" ] && ! should_send_failure_notification; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Failure notification suppressed (already notified)" >> "$GIT_LOG"
+        save_status "failed"
+        return 0
+    fi
+
+    send_deployment_notification "$status" "$message" "$details"
+    save_status "$status"
+}
 
 send_email() {
     local subject="$1"
     local html_body="$2"
-    local is_error="${3:-false}"
 
-    local cooldown_hours=1
-    local now_sec=$(date +%s)
-
-    if [ -f "$EMAIL_COOLDOWN_FILE" ]; then
-        local last_sent=$(cat "$EMAIL_COOLDOWN_FILE")
-        local elapsed=$((now_sec - last_sent))
-        local cooldown_sec=$((cooldown_hours * 3600))
-
-        if [ $elapsed -lt $cooldown_sec ]; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Email suppressed (cooldown active, $((cooldown_sec - elapsed))s remaining)" >> "$GIT_LOG"
-            return 0
-        fi
-    fi
-
-    if [ "$is_error" = "true" ]; then
-        local error_count_file="$LOG_DIR/.error_count"
-        local error_count=0
-
-        if [ -f "$error_count_file" ]; then
-            error_count=$(cat "$error_count_file")
-        fi
-
-        error_count=$((error_count + 1))
-
-        if [ $error_count -lt 3 ]; then
-            echo "$error_count" > "$error_count_file"
-        else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error count: $error_count, email suppressed" >> "$GIT_LOG"
-            return 0
-        fi
-    else
-        rm -f "$LOG_DIR/.error_count"
-    fi
-
-    local response=$(curl -s -X POST "https://api.resend.com/emails" \
+    curl -s -X POST "https://api.resend.com/emails" \
         -H "Authorization: Bearer $RESEND_API_KEY" \
         -H "Content-Type: application/json" \
         -d "{
@@ -62,9 +56,8 @@ send_email() {
             \"to\": [\"$EMAIL_TO\"],
             \"subject\": \"$subject\",
             \"html\": \"$html_body\"
-        }" 2>&1)
+        }" >> "$GIT_LOG" 2>&1
 
-    echo "$(date +%s)" > "$EMAIL_COOLDOWN_FILE"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Email sent: $subject" >> "$GIT_LOG"
 }
 
@@ -140,7 +133,7 @@ send_deployment_notification() {
 </body>
 </html>'
 
-    send_email "SD-UI 部署$status_text" "$html_body" "$([ "$status" = "error" ] && echo "true" || echo "false")"
+    send_email "SD-UI 部署$status_text" "$html_body"
 }
 
 ensure_scripts_executable() {
@@ -158,7 +151,7 @@ LOCAL_HASH=$(git rev-parse HEAD 2>/dev/null || echo "")
 
 if [ -z "$LOCAL_HASH" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error: Not a git repository" >> "$GIT_LOG"
-    send_deployment_notification "error" "Git 仓库错误" "无法读取本地 Git 仓库"
+    notify "error" "Git 仓库错误" "无法读取本地 Git 仓库"
     exit 1
 fi
 
@@ -176,7 +169,7 @@ if ! git rev-parse --verify --quiet HEAD@{u} 2>/dev/null; then
     }
     ensure_scripts_executable
     echo "$REMOTE_HASH" > "$LATEST_HASH_FILE"
-    send_deployment_notification "success" "首次部署完成" "已拉取并构建最新版本"
+    notify "success" "首次部署完成" "已拉取并构建最新版本"
     exit 0
 fi
 
@@ -192,7 +185,7 @@ if [ -n "$LOCAL_CHANGES" ]; then
     if echo "$PULL_RESULT" | grep -q "FAILED"; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, restoring local changes..." >> "$GIT_LOG"
         git stash pop 2>&1 | tee -a "$GIT_LOG" || true
-        send_deployment_notification "error" "拉取失败" "无法从远程拉取更新，本地修改已恢复"
+        notify "error" "拉取失败" "无法从远程拉取更新，本地修改已恢复"
         exit 1
     fi
 
@@ -202,7 +195,7 @@ else
     git pull origin main --ff-only 2>&1 | tee -a "$GIT_LOG" || {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset..." >> "$GIT_LOG"
         git reset --hard origin/main 2>&1 | tee -a "$GIT_LOG" || true
-        send_deployment_notification "warning" "强制同步" "使用硬重置同步到远程版本"
+        notify "warning" "强制同步" "使用硬重置同步到远程版本"
     }
 fi
 
@@ -264,14 +257,14 @@ fi
 
 if [ "$SCRIPTS_CHANGED" = true ] && [ "$BACKEND_CHANGED" = false ] && [ "$FRONTEND_ONLY" = false ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Only scripts changed, no restart needed" >> "$GIT_LOG"
-    send_deployment_notification "success" "脚本已更新" "检测到脚本更新，已自动更新"
+    notify "success" "脚本已更新" "检测到脚本更新，已自动更新"
 elif [ "$BACKEND_CHANGED" = true ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backend/API changes detected, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
         "$SCRIPT_DIR/hot-deploy.sh"
     else
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] hot-deploy.sh not found or not executable" >> "$GIT_LOG"
-        send_deployment_notification "error" "部署脚本错误" "hot-deploy.sh 未找到或无执行权限"
+        notify "error" "部署脚本错误" "hot-deploy.sh 未找到或无执行权限"
         exit 1
     fi
 elif [ "$FRONTEND_ONLY" = true ]; then
@@ -288,7 +281,7 @@ elif [ "$FRONTEND_ONLY" = true ]; then
 
     systemctl --user restart sd-ui 2>/dev/null || true
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend rebuilt successfully (no restart - Next.js hot reload handles it)" >> "$GIT_LOG"
-    send_deployment_notification "success" "前端更新完成" "前端代码已更新并构建，服务持续运行"
+    notify "success" "前端更新完成" "前端代码已更新并构建，服务持续运行"
 else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generic update, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then

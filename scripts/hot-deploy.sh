@@ -8,57 +8,51 @@ LOG_DIR="${HOME}/.local/share/sd-ui/logs"
 LOG_FILE="$LOG_DIR/hot-deploy.log"
 BACKUP_DIR="${HOME}/.local/share/sd-ui/backups"
 SHUTDOWN_TIMEOUT=30
-EMAIL_COOLDOWN_FILE="$LOG_DIR/.email_cooldown"
 
 mkdir -p "$LOG_DIR"
 mkdir -p "$BACKUP_DIR"
-
-RESEND_API_KEY="${RESEND_API_KEY:-re_EiFsWXvy_Ka5uqyxS58mAB3UicJfRt4Kv}"
-EMAIL_FROM="${EMAIL_FROM:-copaw@eray.top}"
-EMAIL_TO="${EMAIL_TO:-285043939@qq.com}"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
+LAST_STATUS_FILE="$LOG_DIR/.last_deploy_status"
+
+get_last_status() {
+    if [ -f "$LAST_STATUS_FILE" ]; then
+        cat "$LAST_STATUS_FILE"
+    else
+        echo "unknown"
+    fi
+}
+
+save_status() {
+    echo "$1" > "$LAST_STATUS_FILE"
+}
+
+should_send_failure_notification() {
+    local last_status=$(get_last_status)
+    [ "$last_status" != "failed" ]
+}
+
+notify() {
+    local status="$1"
+    local message="$2"
+    local details="${3:-}"
+
+    if [ "$status" = "error" ] && ! should_send_failure_notification; then
+        log "Failure notification suppressed (already notified)"
+        save_status "failed"
+        return 0
+    fi
+
+    send_deployment_notification "$status" "$message" "$details"
+    save_status "$status"
+}
+
 send_email() {
     local subject="$1"
     local html_body="$2"
-    local is_error="${3:-false}"
-
-    local cooldown_hours=1
-    local now_sec=$(date +%s)
-
-    if [ -f "$EMAIL_COOLDOWN_FILE" ]; then
-        local last_sent=$(cat "$EMAIL_COOLDOWN_FILE")
-        local elapsed=$((now_sec - last_sent))
-        local cooldown_sec=$((cooldown_hours * 3600))
-
-        if [ $elapsed -lt $cooldown_sec ]; then
-            log "Email suppressed (cooldown active, $((cooldown_sec - elapsed))s remaining)"
-            return 0
-        fi
-    fi
-
-    if [ "$is_error" = "true" ]; then
-        local error_count_file="$LOG_DIR/.deploy_error_count"
-        local error_count=0
-
-        if [ -f "$error_count_file" ]; then
-            error_count=$(cat "$error_count_file")
-        fi
-
-        error_count=$((error_count + 1))
-
-        if [ $error_count -lt 3 ]; then
-            echo "$error_count" > "$error_count_file"
-        else
-            log "Error count: $error_count, email suppressed"
-            return 0
-        fi
-    else
-        rm -f "$LOG_DIR/.deploy_error_count"
-    fi
 
     curl -s -X POST "https://api.resend.com/emails" \
         -H "Authorization: Bearer $RESEND_API_KEY" \
@@ -70,7 +64,6 @@ send_email() {
             \"html\": \"$html_body\"
         }" >> "$LOG_FILE" 2>&1
 
-    echo "$(date +%s)" > "$EMAIL_COOLDOWN_FILE"
     log "Email sent: $subject"
 }
 
@@ -146,7 +139,7 @@ send_deployment_notification() {
 </body>
 </html>'
 
-    send_email "SD-UI 热部署$status_text" "$html_body" "$([ "$status" = "error" ] && echo "true" || echo "false")"
+    send_email "SD-UI 热部署$status_text" "$html_body"
 }
 
 backup_database() {
@@ -315,13 +308,13 @@ detect_and_install_npm_deps
 
 if ! run_npm_install; then
     log "ERROR: npm install failed after retry"
-    send_deployment_notification "error" "依赖安装失败" "npm install 失败，请检查日志"
+    notify "error" "依赖安装失败" "npm install 失败，请检查日志"
     exit 1
 fi
 
 if ! run_prisma_generate; then
     log "ERROR: Prisma generate failed"
-    send_deployment_notification "error" "Prisma 生成失败" "npx prisma generate 失败，请检查日志"
+    notify "error" "Prisma 生成失败" "npx prisma generate 失败，请检查日志"
     exit 1
 fi
 
@@ -344,7 +337,7 @@ if [ $build_exit_code -ne 0 ]; then
 
     if [ $build_exit_code -ne 0 ]; then
         log "ERROR: Build failed after retry"
-        send_deployment_notification "error" "构建失败" "npm run build 失败，请检查日志"
+        notify "error" "构建失败" "npm run build 失败，请检查日志"
         exit 1
     fi
 fi
@@ -359,4 +352,4 @@ systemctl --user restart sd-ui 2>/dev/null || {
 }
 
 log "=== Hot deployment complete ==="
-send_deployment_notification "success" "热部署完成" "所有步骤执行成功，服务已重启"
+notify "success" "热部署完成" "所有步骤执行成功，服务已重启"
