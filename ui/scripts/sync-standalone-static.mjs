@@ -31,16 +31,7 @@ if (!appDir) {
   }
 }
 
-let staticDest;
-if (!appDir) {
-  if (existsSync(join(standaloneRoot, ".next", "static"))) {
-    console.log("standalone static already exists at .next/standalone/.next/static");
-    process.exit(0);
-  }
-  staticDest = join(standaloneRoot, ".next", "static");
-} else {
-  staticDest = join(standaloneRoot, appDir, ".next", "static");
-}
+let staticDest = join(standaloneRoot, ".next", "static");
 
 mkdirSync(staticDest, { recursive: true });
 cpSync(staticSrc, staticDest, { recursive: true, force: true });
