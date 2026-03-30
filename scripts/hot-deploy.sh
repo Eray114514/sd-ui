@@ -350,7 +350,7 @@ fi
 sync_public_files() {
     local standalone_dir="$APP_DIR/.next/standalone"
     local public_src="$APP_DIR/public"
-    local public_dest=""
+    local public_dest="$standalone_dir/public"
 
     if [ ! -d "$standalone_dir" ]; then
         log "Standalone directory not found, skipping public sync"
@@ -360,24 +360,6 @@ sync_public_files() {
     if [ ! -d "$public_src" ]; then
         log "Public directory not found, skipping public sync"
         return
-    fi
-
-    if [ -f "$APP_DIR/package.json" ]; then
-        local app_name=$(node -p "require('$APP_DIR/package.json').name" 2>/dev/null || echo "")
-        if [ -n "$app_name" ] && [ -d "$standalone_dir/$app_name" ]; then
-            public_dest="$standalone_dir/$app_name/public"
-        fi
-    fi
-
-    if [ -z "$public_dest" ]; then
-        local subdirs=($(ls -d "$standalone_dir"/*/ 2>/dev/null || true))
-        if [ ${#subdirs[@]} -eq 1 ]; then
-            public_dest="${subdirs[0]}public"
-        elif [ -d "$standalone_dir/ui" ]; then
-            public_dest="$standalone_dir/ui/public"
-        else
-            public_dest="$standalone_dir/public"
-        fi
     fi
 
     mkdir -p "$public_dest"

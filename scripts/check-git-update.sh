@@ -372,29 +372,12 @@ elif [ "$FRONTEND_ONLY" = true ]; then
 
     local standalone_dir="$APP_DIR/.next/standalone"
     local public_src="$APP_DIR/public"
-    local public_dest=""
+    local public_dest="$standalone_dir/public"
 
     if [ -d "$standalone_dir" ] && [ -d "$public_src" ]; then
-        if [ -f "$APP_DIR/package.json" ]; then
-            local app_name=$(node -p "require('$APP_DIR/package.json').name" 2>/dev/null || echo "")
-            if [ -n "$app_name" ] && [ -d "$standalone_dir/$app_name" ]; then
-                public_dest="$standalone_dir/$app_name/public"
-            fi
-        fi
-
-        if [ -z "$public_dest" ]; then
-            if [ -d "$standalone_dir/ui" ]; then
-                public_dest="$standalone_dir/ui/public"
-            else
-                public_dest="$standalone_dir/public"
-            fi
-        fi
-
-        if [ -n "$public_dest" ]; then
-            mkdir -p "$public_dest"
-            cp -r "$public_src/"* "$public_dest/" 2>/dev/null || true
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public files synced" >> "$GIT_LOG"
-        fi
+        mkdir -p "$public_dest"
+        cp -r "$public_src/"* "$public_dest/" 2>/dev/null || true
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public files synced" >> "$GIT_LOG"
     fi
 
     systemctl --user restart sd-ui 2>/dev/null || true

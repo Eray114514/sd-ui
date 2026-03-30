@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -40,3 +40,11 @@ if (srcFileCount !== destFileCount) {
 }
 
 console.log(`standalone static synced to ${staticDest}`);
+
+const envSrc = join(root, ".env");
+if (existsSync(envSrc)) {
+  copyFileSync(envSrc, join(standaloneRoot, ".env"));
+  console.log(`.env copied to ${standaloneRoot}`);
+} else {
+  console.warn("WARNING: .env file not found, skipping copy");
+}
