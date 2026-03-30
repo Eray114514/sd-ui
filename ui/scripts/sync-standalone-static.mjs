@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -10,29 +10,33 @@ if (!existsSync(staticSrc) || !existsSync(standaloneRoot)) {
   process.exit(0);
 }
 
-let appDir = null;
-try {
-  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  if (pkg?.name && existsSync(join(standaloneRoot, pkg.name))) {
-    appDir = pkg.name;
+function countFiles(dir) {
+  let count = 0;
+  const entries = readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      count += countFiles(join(dir, entry.name));
+    } else {
+      count++;
+    }
   }
-} catch {
-  // Ignore and fall back to directory scan.
+  return count;
 }
 
-if (!appDir) {
-  const dirs = readdirSync(standaloneRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== "node_modules" && entry.name !== ".next")
-    .map((entry) => entry.name);
-  if (dirs.length === 1) {
-    appDir = dirs[0];
-  } else if (dirs.length > 1) {
-    appDir = dirs.find((name) => name === "ui") ?? dirs[0];
-  }
-}
+const srcFileCount = countFiles(staticSrc);
+console.log(`Source .next/static has ${srcFileCount} files`);
 
-let staticDest = join(standaloneRoot, ".next", "static");
+const staticDest = join(standaloneRoot, ".next", "static");
 
 mkdirSync(staticDest, { recursive: true });
 cpSync(staticSrc, staticDest, { recursive: true, force: true });
+
+const destFileCount = countFiles(staticDest);
+console.log(`Destination has ${destFileCount} files`);
+
+if (srcFileCount !== destFileCount) {
+  console.error(`ERROR: File count mismatch! Source: ${srcFileCount}, Destination: ${destFileCount}`);
+  process.exit(1);
+}
+
 console.log(`standalone static synced to ${staticDest}`);
