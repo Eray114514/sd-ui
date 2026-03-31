@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react"
 import { useGenerationStore } from "@/store/generationStore"
-import { getTasks } from "@/services/tasksService"
+import { getTasks, clearTasksCache } from "@/services/tasksService"
 import { getProgress } from "@/services/progressService"
 import { UI_CONSTANTS } from "@/constants"
 import { tasksPollingManager, progressPollingManager } from "@/lib/pollingManager"
@@ -11,8 +11,12 @@ import { TaskCard } from "@/components/custom/TaskCard"
 import { ImageDetailModal } from "@/components/custom/ImageDetailModal"
 import { Loader2 } from "lucide-react"
 
-export function TaskList() {
-  const [tasks, setTasks] = useState<Task[]>([])
+interface TaskListProps {
+  initialTasks: Task[]
+}
+
+export function TaskList({ initialTasks }: TaskListProps) {
+  const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const bottomSpacerHeight = useGenerationStore(state => state.bottomSpacerHeight)
   const [selectedImage, setSelectedImage] = useState<ImageWithTask | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -22,7 +26,7 @@ export function TaskList() {
   const [progressDataSnapshot, setProgressDataSnapshot] = useState<Record<string, ProgressData>>({})
   const rafIdRef = useRef<number | null>(null)
   const lastUpdateRef = useRef<number>(0)
-  const [isInitialLoaded, setIsInitialLoaded] = useState(false)
+  const [isInitialLoaded, setIsInitialLoaded] = useState(true)
 
   const updateProgressSnapshot = useCallback(() => {
     const now = Date.now()
@@ -86,12 +90,12 @@ export function TaskList() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
+        // 轮询时清除缓存，确保获取最新数据
+        clearTasksCache()
         const data = await getTasks()
         setTasks(data)
-        if (data.length === 0) setIsInitialLoaded(true)
       } catch (e) {
         console.error('Failed to fetch tasks:', e)
-        setIsInitialLoaded(true)
       }
     }
 
@@ -99,8 +103,6 @@ export function TaskList() {
       shouldScrollRef.current = true // 用户创建任务时标记需要自动下滚
       fetchTasks()
     }
-
-    fetchTasks()
 
     tasksPollingManager.start(handleTaskCreated)
     window.addEventListener('task-created', handleTaskCreated)
