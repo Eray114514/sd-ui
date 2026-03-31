@@ -451,7 +451,7 @@ run_prisma_migrate
 
 log "Building..."
 npm run build >> "$LOG_FILE" 2>&1
-local build_exit_code=$?
+build_exit_code=$?
 
 if [ $build_exit_code -ne 0 ]; then
     log "WARNING: Build exited with code $build_exit_code"
