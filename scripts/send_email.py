@@ -38,8 +38,21 @@ def send_email(subject, html_body):
             return True
 
     except urllib.error.HTTPError as e:
-        error_body = json.loads(e.read().decode("utf-8"))
-        print(f"HTTP Error {e.code}: {error_body}")
+        error_raw = ""
+        error_body = None
+        try:
+            error_raw = e.read().decode("utf-8")
+            if error_raw.strip():
+                error_body = json.loads(error_raw)
+        except Exception:
+            pass
+        if error_body:
+            print(f"HTTP Error {e.code}: {json.dumps(error_body, ensure_ascii=False)}")
+        else:
+            print(f"HTTP Error {e.code}: {error_raw if error_raw else '(empty response)'}")
+        return False
+    except json.JSONDecodeError as e:
+        print(f"JSON Decode Error: {e}")
         return False
     except Exception as e:
         print(f"Error: {e}")
