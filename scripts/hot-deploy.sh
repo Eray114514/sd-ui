@@ -22,42 +22,129 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
-ensure_static_files() {
+HEALTH_CHECK_LOG="$LOG_DIR/health-check.log"
+
+health_check() {
+    local issues=()
     local standalone_dir="$APP_DIR/.next/standalone"
     local static_src="$APP_DIR/.next/static"
     local static_dest="$standalone_dir/.next/static"
     local public_src="$APP_DIR/public"
     local public_dest="$standalone_dir/public"
-    local fixed=false
 
-    if [ ! -d "$standalone_dir" ]; then
-        return
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Health Check Start ===" >> "$HEALTH_CHECK_LOG"
+
+    if [ ! -d "$APP_DIR/node_modules" ]; then
+        issues+=("node_modules missing")
+        echo "[Health] node_modules missing" >> "$HEALTH_CHECK_LOG"
+    fi
+
+    if [ ! -f "$standalone_dir/server.js" ]; then
+        issues+=("standalone build missing")
+        echo "[Health] standalone build missing" >> "$HEALTH_CHECK_LOG"
     fi
 
     if [ -d "$static_src" ]; then
         if [ ! -d "$static_dest" ] || [ -z "$(ls -A "$static_dest" 2>/dev/null)" ]; then
-            log "Health check: Fixing missing static files..."
-            mkdir -p "$static_dest"
-            cp -r "$static_src/"* "$static_dest/" 2>/dev/null || true
-            fixed=true
+            issues+=("static files missing")
+            echo "[Health] static files missing in standalone" >> "$HEALTH_CHECK_LOG"
         fi
     fi
 
     if [ -d "$public_src" ]; then
         if [ ! -d "$public_dest" ] || [ -z "$(ls -A "$public_dest" 2>/dev/null)" ]; then
-            log "Health check: Fixing missing public files..."
-            mkdir -p "$public_dest"
-            cp -r "$public_src/"* "$public_dest/" 2>/dev/null || true
-            fixed=true
+            issues+=("public files missing")
+            echo "[Health] public files missing in standalone" >> "$HEALTH_CHECK_LOG"
         fi
     fi
 
-    if [ "$fixed" = true ]; then
-        log "Health check: Static files repaired"
+    if [ -f "$APP_DIR/prisma/schema.prisma" ]; then
+        cd "$APP_DIR"
+        if ! npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
+            issues+=("prisma migration pending")
+            echo "[Health] prisma migration pending or failed" >> "$HEALTH_CHECK_LOG"
+        fi
+        cd "$REPO_DIR"
     fi
+
+    if [ ${#issues[@]} -eq 0 ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health check passed" >> "$HEALTH_CHECK_LOG"
+        return 0
+    fi
+
+    log "Health check found issues: ${issues[*]}"
+
+    local need_rebuild=false
+    local need_migrate=false
+
+    for issue in "${issues[@]}"; do
+        case "$issue" in
+            "node_modules missing"|"standalone build missing")
+                need_rebuild=true
+                ;;
+            "prisma migration pending")
+                need_migrate=true
+                ;;
+        esac
+    done
+
+    if [ "$need_rebuild" = true ]; then
+        log "Health repair: Running full rebuild..."
+        cd "$APP_DIR"
+        npm install >> "$HEALTH_CHECK_LOG" 2>&1 || true
+        npx prisma generate >> "$HEALTH_CHECK_LOG" 2>&1 || true
+        npm run build >> "$HEALTH_CHECK_LOG" 2>&1 || true
+
+        if [ -f "$APP_DIR/scripts/sync-standalone-static.mjs" ]; then
+            node "$APP_DIR/scripts/sync-standalone-static.mjs" >> "$HEALTH_CHECK_LOG" 2>&1 || true
+        fi
+
+        if [ -d "$public_src" ] && [ -d "$standalone_dir" ]; then
+            mkdir -p "$public_dest"
+            cp -r "$public_src/"* "$public_dest/" 2>/dev/null || true
+        fi
+        cd "$REPO_DIR"
+        log "Health repair: Rebuild complete"
+    else
+        if [ ! -d "$standalone_dir" ]; then
+            log "Health repair: standalone dir not found, skipping file sync"
+            return 1
+        fi
+
+        for issue in "${issues[@]}"; do
+            case "$issue" in
+                "static files missing")
+                    log "Health repair: Syncing static files..."
+                    mkdir -p "$static_dest"
+                    cp -r "$static_src/"* "$static_dest/" 2>/dev/null || true
+                    ;;
+                "public files missing")
+                    log "Health repair: Syncing public files..."
+                    mkdir -p "$public_dest"
+                    cp -r "$public_src/"* "$public_dest/" 2>/dev/null || true
+                    ;;
+            esac
+        done
+    fi
+
+    if [ "$need_migrate" = true ]; then
+        log "Health repair: Running prisma migrate deploy..."
+        cd "$APP_DIR"
+        npx prisma migrate deploy >> "$HEALTH_CHECK_LOG" 2>&1 || true
+        cd "$REPO_DIR"
+        log "Health repair: Migration complete"
+    fi
+
+    if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ]; then
+        log "Health repair: Restarting service..."
+        systemctl --user restart sd-ui 2>/dev/null || true
+    fi
+
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Health Check End (Repaired) ===" >> "$HEALTH_CHECK_LOG"
+    return 0
 }
 
-ensure_static_files
+health_check
 
 LAST_STATUS_FILE="$LOG_DIR/.last_deploy_status"
 
