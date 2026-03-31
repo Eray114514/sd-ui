@@ -9,14 +9,30 @@ import { tasksPollingManager, progressPollingManager } from "@/lib/pollingManage
 import type { Task, ProgressData, ImageWithTask } from "@/types"
 import { TaskCard } from "@/components/custom/TaskCard"
 import { ImageDetailModal } from "@/components/custom/ImageDetailModal"
-import { Loader2 } from "lucide-react"
 
 interface TaskListProps {
   initialTasks: Task[]
 }
 
+const LOCAL_STORAGE_KEY = 'tasks_cache'
+
 export function TaskList({ initialTasks }: TaskListProps) {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const storedData = localStorage.getItem(LOCAL_STORAGE_KEY)
+        if (storedData) {
+          const { tasks, timestamp } = JSON.parse(storedData)
+          if (Date.now() - timestamp < 5 * 60 * 1000) {
+            return tasks
+          }
+        }
+      } catch (error) {
+        console.error('Error reading from localStorage:', error)
+      }
+    }
+    return initialTasks
+  })
   const bottomSpacerHeight = useGenerationStore(state => state.bottomSpacerHeight)
   const [selectedImage, setSelectedImage] = useState<ImageWithTask | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -26,7 +42,6 @@ export function TaskList({ initialTasks }: TaskListProps) {
   const [progressDataSnapshot, setProgressDataSnapshot] = useState<Record<string, ProgressData>>({})
   const rafIdRef = useRef<number | null>(null)
   const lastUpdateRef = useRef<number>(0)
-  const [isInitialLoaded, setIsInitialLoaded] = useState(true)
 
   const updateProgressSnapshot = useCallback(() => {
     const now = Date.now()
@@ -47,19 +62,14 @@ export function TaskList({ initialTasks }: TaskListProps) {
   useEffect(() => {
     if (tasks.length > 0) {
       if (initialLoadRef.current) {
-        // 初始加载：滚动到绝对底部
-        requestAnimationFrame(() => {
-          window.scrollTo(0, document.documentElement.scrollHeight)
-          setTimeout(() => setIsInitialLoaded(true), 50)
-        })
+        // 初始加载：立即滚动到底部，没有延迟
+        window.scrollTo(0, document.documentElement.scrollHeight)
         initialLoadRef.current = false
       } else if (shouldScrollRef.current && bottomRef.current) {
         // 仅在用户手动创建任务时自动下滚，轮询刷新不触发
         bottomRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
         shouldScrollRef.current = false
       }
-    } else if (tasks.length === 0 && !initialLoadRef.current) {
-      queueMicrotask(() => setIsInitialLoaded(true))
     }
   }, [tasks.length])
 
@@ -155,15 +165,7 @@ export function TaskList({ initialTasks }: TaskListProps) {
 
   return (
     <>
-      {!isInitialLoaded && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background h-[100dvh]">
-          <div className="flex flex-col items-center gap-4 text-muted-foreground">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <p className="text-sm font-medium">正在加载生成记录...</p>
-          </div>
-        </div>
-      )}
-      <div className={`w-full px-4 pt-6 pb-[20px] flex flex-col items-center transition-opacity duration-300 ${isInitialLoaded ? 'opacity-100' : 'opacity-0'}`}>
+      <div className="w-full px-4 pt-6 pb-[20px] flex flex-col items-center">
       <div className="w-full max-w-4xl flex flex-col gap-8">
         {tasks.length === 0 && <p className="text-muted-foreground text-center mt-20">暂无生成记录，开始你的创作吧</p>}
 

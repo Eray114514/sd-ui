@@ -11,8 +11,8 @@ export async function GET() {
     try {
         const tasks = await prisma.task.findMany({
             orderBy: [
-                { createdAt: 'asc' },
-                { id: 'asc' }
+                { createdAt: 'desc' },
+                { id: 'desc' }
             ],
             take: 500,
             include: { images: true }
@@ -20,7 +20,7 @@ export async function GET() {
 
         logger.debug({ count: tasks.length }, 'Fetched tasks')
 
-        return NextResponse.json(tasks, {
+        return NextResponse.json(tasks.reverse(), {
             headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate, proxy-revalidate',
                 'Pragma': 'no-cache',
