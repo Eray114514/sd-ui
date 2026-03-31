@@ -2,16 +2,16 @@
 
 ## 概述
 
-SD-UI 采用 **Windows 开发 → Linux 自动部署** 的工作流。当代码推送到 GitHub 后，Linux 服务器自动检测更新并完成构建、部署、重启，全程无需人工干预。
+SD-UI 采用 **任意开发端 → Linux 服务器自动部署** 的工作流。开发端与服务器不在同一域（跨平台、跨网络），通过 GitHub 作为中转。当代码推送到 GitHub 后，Linux 服务器自动检测更新并完成构建、部署、重启，全程无需人工干预。
 
 ```
-Windows (开发/推送)
+开发端 (Windows/macOS/Linux)
        │
        ▼
    GitHub
        │
        ▼
-Linux (自动检测 + 部署)
+Linux 服务器 (自动检测 + 部署)
    ┌─────────────────────────────────────┐
    │  Cron (每分钟)                        │
    │       │                              │
@@ -79,8 +79,93 @@ sd-ui/
 ├── logs/
 │   ├── git-pull.log           # 更新检测日志
 │   └── hot-deploy.log         # 部署日志
-└── backups/                   # 数据库备份
+├── backups/                   # 数据库备份
+├── state/
+│   ├── version.json           # 当前部署版本信息
+│   └── deploy_stats.json      # 部署统计历史
+└── lock/                      # 部署锁文件（防止并发）
 ```
+
+## 系统可靠性增强
+
+热部署系统内置多重可靠性保障机制，确保部署过程稳定可靠。
+
+### 并发控制（锁机制）
+
+通过 PID 锁文件防止多个部署任务同时执行：
+
+```bash
+# 锁文件位置
+~/.local/share/sd-ui/lock/deploy.lock
+
+# 机制：检测到锁文件时，60 秒内的后续执行会被跳过
+```
+
+### 版本状态追踪
+
+系统记录每次部署的状态，便于问题排查：
+
+```bash
+cat ~/.local/share/sd-ui/state/version.json
+```
+
+```json
+{
+  "commit": "803bafe",
+  "deployed_at": "2026-03-31 22:00:35",
+  "result": "success",
+  "duration": 80
+}
+```
+
+### 部署统计
+
+记录历史部署记录（最近 50 条）：
+
+```bash
+cat ~/.local/share/sd-ui/state/deploy_stats.json
+```
+
+### 日志轮转
+
+日志文件自动管理，防止占用过多磁盘空间：
+
+- 单个日志文件超过 **10MB** 时自动压缩归档
+- 保留最近 **5 个**压缩备份
+- 归档文件名：`*.log.1.gz`、`*.log.2.gz`...
+
+### HTTP 健康检查
+
+部署完成后自动验证服务可用性：
+
+```bash
+# 检查项目
+curl -f http://localhost:3001/api/health
+
+# 检查 Nginx 代理
+curl -f http://localhost:3000/
+```
+
+健康检查失败时：
+1. 记录警告但不中断部署流程
+2. 邮件通知中标记为"警告"状态
+3. 不影响实际部署结果判定
+
+### 环境变量验证
+
+部署前自动检查必要环境变量：
+
+| 变量 | 说明 |
+|------|------|
+| `RESEND_API_KEY` | Resend API 密钥（邮件发送用） |
+| `EMAIL_FROM` | 发件邮箱地址 |
+| `EMAIL_TO` | 收件邮箱地址 |
+| `PORT` | 应用监听端口（默认 3001） |
+
+缺少环境变量时：
+- 脚本继续执行（不阻断部署）
+- 日志中输出警告
+- 邮件通知会提示配置问题
 
 ## 部署步骤
 
@@ -152,7 +237,7 @@ git push
 ### 场景 1：修改前端样式
 
 ```bash
-# Windows
+# 开发端
 # 编辑 ui/src/app/globals.css
 git add . && git commit -m "fix: adjust button colors" && git push
 ```
@@ -168,7 +253,7 @@ Linux 响应：
 ### 场景 2：修改 API 路由
 
 ```bash
-# Windows
+# 开发端
 # 编辑 ui/src/app/api/tasks/route.ts
 git add . && git commit -m "feat: add batch task endpoint" && git push
 ```
@@ -191,7 +276,7 @@ Linux 响应：
 ### 场景 3：更新部署脚本
 
 ```bash
-# Windows
+# 开发端
 # 编辑 scripts/hot-deploy.sh
 git add . && git commit -m "enhance: add backup rotation" && git push
 ```
