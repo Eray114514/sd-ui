@@ -306,18 +306,19 @@ notify() {
 
 send_email() {
     local subject="$1"
-    local html_body="$2"
+    local status="$2"
+    local message="$3"
+    local commit_title="$4"
+    local commit_body="$5"
+    local changed_files="$6"
+    local extra_details="$7"
+    local current_version="$8"
 
-    local tmp_file="/tmp/sd_ui_email_$(date +%s).html"
-    echo "$html_body" > "$tmp_file"
-
-    if python3 "$SCRIPT_DIR/send_email.py" "$subject" "$tmp_file" >> "$GIT_LOG" 2>&1; then
+    if python3 "$SCRIPT_DIR/send_email.py" "$subject" "$status" "$message" "$commit_title" "$commit_body" "$changed_files" "$extra_details" "$current_version" >> "$GIT_LOG" 2>&1; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Email sent: $subject" >> "$GIT_LOG"
     else
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Email failed: $subject" >> "$GIT_LOG"
     fi
-
-    rm -f "$tmp_file"
 }
 
 send_deployment_notification() {
@@ -328,144 +329,18 @@ send_deployment_notification() {
     local changed_files="$5"
     local extra_details="$6"
 
-    local status_color="#10B981"
-    local status_bg="#ECFDF5"
     local status_text="成功"
-    local card_border="#374151"
-
     if [ "$status" = "error" ]; then
-        status_color="#EF4444"
-        status_bg="#FEF2F2"
         status_text="失败"
-        card_border="#7F1D1D"
     elif [ "$status" = "warning" ]; then
-        status_color="#F59E0B"
-        status_bg="#FFFBEB"
-        card_border="#92400E"
         status_text="警告"
     elif [ "$status" = "health_repaired" ]; then
-        status_color="#3B82F6"
-        status_bg="#EFF6FF"
         status_text="自愈"
-        card_border="#1E40AF"
-    fi
-
-    local files_html=""
-    if [ -n "$changed_files" ]; then
-        local files_list=""
-        for f in $changed_files; do
-            local file_icon="📄"
-            case "$f" in
-                *.sh) file_icon="🔧" ;;
-                *.tsx|*.ts) file_icon="⚛️" ;;
-                *.json) file_icon="📋" ;;
-                *.css|*.scss) file_icon="🎨" ;;
-                *.prisma) file_icon="🗃️" ;;
-                *.md) file_icon="📝" ;;
-                ui/public/*) file_icon="🖼️" ;;
-            esac
-            files_list="${files_list}<div style='display:flex;align-items:center;padding:8px 12px;background:#1F2937;border-radius:6px;margin-bottom:6px;font-family:ui-monospace,monospace;font-size:13px;'><span style='margin-right:10px;'>${file_icon}</span><span style='color:#E5E7EB;word-break:break-all;'>${f}</span></div>"
-        done
-        files_html="<div style='margin-top:20px;'>
-            <div style='font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;'>变更文件</div>
-            ${files_list}
-        </div>"
-    fi
-
-    local commit_html=""
-    if [ -n "$commit_title" ]; then
-        commit_html="<div style='margin-top:20px;'>
-            <div style='font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;'>Commit</div>
-            <div style='background:#1F2937;border-radius:8px;padding:16px;border-left:3px solid ${status_color};'>
-                <div style='font-size:15px;font-weight:600;color:#F3F4F6;margin-bottom:8px;'>${commit_title}</div>"
-        if [ -n "$commit_body" ]; then
-            commit_html="${commit_html}<div style='font-size:13px;color:#9CA3AF;line-height:1.6;white-space:pre-wrap;'>${commit_body}</div>"
-        fi
-        commit_html="${commit_html}</div></div>"
-    fi
-
-    local details_html=""
-    if [ -n "$extra_details" ]; then
-        details_html="<div style='margin-top:20px;'>
-            <div style='font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;'>详细信息</div>
-            <div style='background:#1F2937;border-radius:8px;padding:16px;font-size:13px;color:#D1D5DB;line-height:1.6;white-space:pre-wrap;'>${extra_details}</div>
-        </div>"
     fi
 
     local current_version=$(get_current_version)
-    local version_html=""
-    if [ "$current_version" != "unknown" ]; then
-        version_html="<div style='margin-top:12px;font-size:12px;color:#6B7280;'>当前版本: ${current_version:0:8}</div>"
-    fi
 
-    local html_body='<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <style>
-        body { margin: 0; padding: 0; background-color: #111827; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-    </style>
-</head>
-<body>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#111827;padding:30px 15px;">
-        <tr>
-            <td align="center">
-                <table width="560" cellpadding="0" cellspacing="0" style="background:#1F2937;border-radius:16px;overflow:hidden;border:1px solid #374151;max-width:560px;">
-                    <tr>
-                        <td style="padding:28px 32px;border-bottom:1px solid #374151;">
-                            <table width="100%" cellpadding="0" cellspacing="0">
-                                <tr>
-                                    <td>
-                                        <div style="display:flex;align-items:center;">
-                                            <div style="width:40px;height:40px;background:linear-gradient(135deg,${status_color} 0%,$(echo $status_color | sed 's/#/%23/')99 100%);border-radius:10px;margin-right:14px;display:flex;align-items:center;justify-content:center;">
-                                                <span style="font-size:20px;">🚀</span>
-                                            </div>
-                                            <div>
-                                                <div style="font-size:18px;font-weight:700;color:#F9FAFB;">SD-UI</div>
-                                                <div style="font-size:12px;color:#6B7280;">自动部署系统</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td align="right">
-                                        <span style="display:inline-block;padding:6px 14px;border-radius:20px;background:${status_bg};color:${status_color};font-size:13px;font-weight:600;">${status_text}</span>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding:28px 32px;">
-                            <div style="margin-bottom:20px;">
-                                <div style="font-size:13px;color:#6B7280;margin-bottom:6px;">消息</div>
-                                <div style="font-size:16px;color:#F3F4F6;font-weight:500;">${message}</div>
-                            </div>
-                            <div style="margin-bottom:20px;">
-                                <div style="font-size:13px;color:#6B7280;margin-bottom:6px;">时间</div>
-                                <div style="font-size:14px;color:#D1D5DB;">'"$(date '+%Y-%m-%d %H:%M:%S')"'</div>
-                            </div>
-                            '"$commit_html"'
-                            '"$files_html"'
-                            '"$details_html"'
-                            '"$version_html"'
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding:20px 32px;background:#111827;border-top:1px solid #374151;">
-                            <div style="text-align:center;">
-                                <span style="font-size:12px;color:#4B5563;">此邮件由 SD-UI 自动部署系统发送</span>
-                            </div>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>'
-
-    send_email "SD-UI 部署${status_text}" "$html_body"
+    send_email "SD-UI 部署${status_text}" "$status" "$message" "$commit_title" "$commit_body" "$changed_files" "$extra_details" "$current_version"
 }
 
 ensure_scripts_executable() {
