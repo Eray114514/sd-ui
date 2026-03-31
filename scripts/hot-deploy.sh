@@ -22,6 +22,43 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
+ensure_static_files() {
+    local standalone_dir="$APP_DIR/.next/standalone"
+    local static_src="$APP_DIR/.next/static"
+    local static_dest="$standalone_dir/.next/static"
+    local public_src="$APP_DIR/public"
+    local public_dest="$standalone_dir/public"
+    local fixed=false
+
+    if [ ! -d "$standalone_dir" ]; then
+        return
+    fi
+
+    if [ -d "$static_src" ]; then
+        if [ ! -d "$static_dest" ] || [ -z "$(ls -A "$static_dest" 2>/dev/null)" ]; then
+            log "Health check: Fixing missing static files..."
+            mkdir -p "$static_dest"
+            cp -r "$static_src/"* "$static_dest/" 2>/dev/null || true
+            fixed=true
+        fi
+    fi
+
+    if [ -d "$public_src" ]; then
+        if [ ! -d "$public_dest" ] || [ -z "$(ls -A "$public_dest" 2>/dev/null)" ]; then
+            log "Health check: Fixing missing public files..."
+            mkdir -p "$public_dest"
+            cp -r "$public_src/"* "$public_dest/" 2>/dev/null || true
+            fixed=true
+        fi
+    fi
+
+    if [ "$fixed" = true ]; then
+        log "Health check: Static files repaired"
+    fi
+}
+
+ensure_static_files
+
 LAST_STATUS_FILE="$LOG_DIR/.last_deploy_status"
 
 get_last_status() {
