@@ -6,11 +6,139 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="$REPO_DIR/ui"
 LOG_DIR="${HOME}/.local/share/sd-ui/logs"
 LOG_FILE="$LOG_DIR/hot-deploy.log"
+HEALTH_CHECK_LOG="$LOG_DIR/health-check.log"
 BACKUP_DIR="${HOME}/.local/share/sd-ui/backups"
+LOCK_FILE="/tmp/sd-ui-hot-deploy.lock"
+VERSION_FILE="$LOG_DIR/.current_version"
+STATS_FILE="$LOG_DIR/deploy_stats.json"
+LAST_STATUS_FILE="$LOG_DIR/.last_deploy_status"
 SHUTDOWN_TIMEOUT=30
 
 mkdir -p "$LOG_DIR"
 mkdir -p "$BACKUP_DIR"
+
+acquire_lock() {
+    if [ -f "$LOCK_FILE" ]; then
+        local pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            log "Another instance is running (PID: $pid), exiting"
+            exit 0
+        fi
+        rm -f "$LOCK_FILE"
+    fi
+    echo $$ > "$LOCK_FILE"
+    trap "rm -f $LOCK_FILE" EXIT
+}
+
+rotate_logs() {
+    local max_size_mb=10
+    local max_backups=5
+    
+    for log in "$LOG_DIR"/*.log; do
+        [ -f "$log" ] || continue
+        
+        local size_kb=$(du -k "$log" 2>/dev/null | cut -f1)
+        local size_mb=$((size_kb / 1024))
+        
+        if [ "$size_mb" -ge "$max_size_mb" ]; then
+            local timestamp=$(date +%Y%m%d_%H%M%S)
+            local backup="${log%.*}.${timestamp}.bak"
+            mv "$log" "$backup"
+            gzip "$backup" 2>/dev/null || true
+            
+            local backups=($(ls -t "${log%.*}".*.bak.gz 2>/dev/null || true))
+            if [ ${#backups[@]} -gt "$max_backups" ]; then
+                for ((i=max_backups; i<${#backups[@]}; i++)); do
+                    rm -f "${backups[$i]}"
+                done
+            fi
+            
+            touch "$log"
+            log "Log rotated from $backup"
+        fi
+    done
+}
+
+record_stats() {
+    local status="$1"
+    local duration="$2"
+    local commit="${3:-unknown}"
+    local issues="${4:-}"
+    
+    local stat_entry=$(cat <<EOF
+{"timestamp":"$(date -Iseconds)","status":"$status","duration":$duration,"commit":"$commit","issues":"$issues"}
+EOF
+)
+    echo "$stat_entry" >> "$STATS_FILE"
+    
+    local lines=$(wc -l < "$STATS_FILE" 2>/dev/null || echo "0")
+    if [ "$lines" -gt 100 ]; then
+        tail -100 "$STATS_FILE" > "${STATS_FILE}.tmp"
+        mv "${STATS_FILE}.tmp" "$STATS_FILE"
+    fi
+}
+
+save_version() {
+    local commit=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+    echo "$commit" > "$VERSION_FILE"
+    log "Version saved: $commit"
+}
+
+get_current_version() {
+    cat "$VERSION_FILE" 2>/dev/null || echo "unknown"
+}
+
+validate_env() {
+    local missing=()
+    
+    if [ -z "${DATABASE_URL:-}" ]; then
+        missing+=("DATABASE_URL")
+    fi
+    if [ -z "${RESEND_API_KEY:-}" ]; then
+        missing+=("RESEND_API_KEY")
+    fi
+    if [ -z "${EMAIL_FROM:-}" ]; then
+        missing+=("EMAIL_FROM")
+    fi
+    if [ -z "${EMAIL_TO:-}" ]; then
+        missing+=("EMAIL_TO")
+    fi
+    
+    if [ ${#missing[@]} -gt 0 ]; then
+        log "Missing required env vars: ${missing[*]}"
+        return 1
+    fi
+    return 0
+}
+
+check_service_health() {
+    local max_retries=30
+    local retry=0
+    local port="${PORT:-3001}"
+    
+    log "Checking service health on port $port..."
+    
+    while [ $retry -lt $max_retries ]; do
+        if curl -sf "http://localhost:$port/" > /dev/null 2>&1; then
+            log "Service health check passed"
+            return 0
+        fi
+        sleep 1
+        ((retry++))
+    done
+    
+    log "Service health check failed after ${max_retries}s"
+    return 1
+}
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+acquire_lock
+rotate_logs
+
+START_TIME=$(date +%s)
 
 if [ -f "$APP_DIR/.env" ]; then
     set -a
@@ -18,11 +146,12 @@ if [ -f "$APP_DIR/.env" ]; then
     set +a
 fi
 
-log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
-}
+if ! validate_env; then
+    notify "error" "环境变量缺失" "缺少必要的环境变量，请检查 .env 文件" "" "" ""
+    exit 1
+fi
 
-HEALTH_CHECK_LOG="$LOG_DIR/health-check.log"
+HEALTH_ISSUES=""
 
 health_check() {
     local issues=()
@@ -141,12 +270,12 @@ health_check() {
     fi
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Health Check End (Repaired) ===" >> "$HEALTH_CHECK_LOG"
+    
+    HEALTH_ISSUES="${issues[*]}"
     return 0
 }
 
 health_check
-
-LAST_STATUS_FILE="$LOG_DIR/.last_deploy_status"
 
 get_last_status() {
     if [ -f "$LAST_STATUS_FILE" ]; then
@@ -168,7 +297,10 @@ should_send_failure_notification() {
 notify() {
     local status="$1"
     local message="$2"
-    local details="${3:-}"
+    local commit_title="${3:-}"
+    local commit_body="${4:-}"
+    local changed_files="${5:-}"
+    local extra_details="${6:-}"
 
     if [ "$status" = "error" ] && ! should_send_failure_notification; then
         log "Failure notification suppressed (already notified)"
@@ -176,7 +308,7 @@ notify() {
         return 0
     fi
 
-    send_deployment_notification "$status" "$message" "$details"
+    send_deployment_notification "$status" "$message" "$commit_title" "$commit_body" "$changed_files" "$extra_details"
     save_status "$status"
 }
 
@@ -199,17 +331,79 @@ send_email() {
 send_deployment_notification() {
     local status="$1"
     local message="$2"
-    local details="${3:-}"
+    local commit_title="$3"
+    local commit_body="$4"
+    local changed_files="$5"
+    local extra_details="$6"
 
-    local color="#4CAF50"
+    local status_color="#10B981"
+    local status_bg="#ECFDF5"
     local status_text="成功"
+    local card_border="#374151"
 
     if [ "$status" = "error" ]; then
-        color="#f44336"
+        status_color="#EF4444"
+        status_bg="#FEF2F2"
         status_text="失败"
+        card_border="#7F1D1D"
     elif [ "$status" = "warning" ]; then
-        color="#FF9800"
+        status_color="#F59E0B"
+        status_bg="#FFFBEB"
+        card_border="#92400E"
         status_text="警告"
+    elif [ "$status" = "health_repaired" ]; then
+        status_color="#3B82F6"
+        status_bg="#EFF6FF"
+        status_text="自愈"
+        card_border="#1E40AF"
+    fi
+
+    local files_html=""
+    if [ -n "$changed_files" ]; then
+        local files_list=""
+        for f in $changed_files; do
+            local file_icon="📄"
+            case "$f" in
+                *.sh) file_icon="🔧" ;;
+                *.tsx|*.ts) file_icon="⚛️" ;;
+                *.json) file_icon="📋" ;;
+                *.css|*.scss) file_icon="🎨" ;;
+                *.prisma) file_icon="🗃️" ;;
+                *.md) file_icon="📝" ;;
+                ui/public/*) file_icon="🖼️" ;;
+            esac
+            files_list="${files_list}<div style='display:flex;align-items:center;padding:8px 12px;background:#1F2937;border-radius:6px;margin-bottom:6px;font-family:ui-monospace,monospace;font-size:13px;'><span style='margin-right:10px;'>${file_icon}</span><span style='color:#E5E7EB;word-break:break-all;'>${f}</span></div>"
+        done
+        files_html="<div style='margin-top:20px;'>
+            <div style='font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;'>变更文件</div>
+            ${files_list}
+        </div>"
+    fi
+
+    local commit_html=""
+    if [ -n "$commit_title" ]; then
+        commit_html="<div style='margin-top:20px;'>
+            <div style='font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;'>Commit</div>
+            <div style='background:#1F2937;border-radius:8px;padding:16px;border-left:3px solid ${status_color};'>
+                <div style='font-size:15px;font-weight:600;color:#F3F4F6;margin-bottom:8px;'>${commit_title}</div>"
+        if [ -n "$commit_body" ]; then
+            commit_html="${commit_html}<div style='font-size:13px;color:#9CA3AF;line-height:1.6;white-space:pre-wrap;'>${commit_body}</div>"
+        fi
+        commit_html="${commit_html}</div></div>"
+    fi
+
+    local details_html=""
+    if [ -n "$extra_details" ]; then
+        details_html="<div style='margin-top:20px;'>
+            <div style='font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;'>详细信息</div>
+            <div style='background:#1F2937;border-radius:8px;padding:16px;font-size:13px;color:#D1D5DB;line-height:1.6;white-space:pre-wrap;'>${extra_details}</div>
+        </div>"
+    fi
+
+    local current_version=$(get_current_version)
+    local version_html=""
+    if [ "$current_version" != "unknown" ]; then
+        version_html="<div style='margin-top:12px;font-size:12px;color:#6B7280;'>当前版本: ${current_version:0:8}</div>"
     fi
 
     local html_body='<!DOCTYPE html>
@@ -218,47 +412,58 @@ send_deployment_notification() {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <style>
+        body { margin: 0; padding: 0; background-color: #111827; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    </style>
 </head>
-<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px;">
+<body>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#111827;padding:30px 15px;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                <table width="560" cellpadding="0" cellspacing="0" style="background:#1F2937;border-radius:16px;overflow:hidden;border:1px solid #374151;max-width:560px;">
                     <tr>
-                        <td style="background-color:'"$color"';padding:20px;text-align:center;">
-                            <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:600;">SD-UI 热部署结果</h1>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding:30px;">
+                        <td style="padding:28px 32px;border-bottom:1px solid #374151;">
                             <table width="100%" cellpadding="0" cellspacing="0">
                                 <tr>
-                                    <td style="padding:10px 0;border-bottom:1px solid #eee;">
-                                        <strong style="color:#666;font-size:14px;">状态</strong>
+                                    <td>
+                                        <div style="display:flex;align-items:center;">
+                                            <div style="width:40px;height:40px;background:linear-gradient(135deg,${status_color} 0%,$(echo $status_color | sed 's/#/%23/')99 100%);border-radius:10px;margin-right:14px;display:flex;align-items:center;justify-content:center;">
+                                                <span style="font-size:20px;">🚀</span>
+                                            </div>
+                                            <div>
+                                                <div style="font-size:18px;font-weight:700;color:#F9FAFB;">SD-UI</div>
+                                                <div style="font-size:12px;color:#6B7280;">热部署系统</div>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td style="padding:10px 0;border-bottom:1px solid #eee;text-align:right;">
-                                        <span style="display:inline-block;padding:4px 12px;border-radius:4px;background-color:'"$color"';color:#ffffff;font-size:14px;font-weight:500;">'"$status_text"'</span>
+                                    <td align="right">
+                                        <span style="display:inline-block;padding:6px 14px;border-radius:20px;background:${status_bg};color:${status_color};font-size:13px;font-weight:600;">${status_text}</span>
                                     </td>
                                 </tr>
-                                <tr>
-                                    <td style="padding:10px 0;border-bottom:1px solid #eee;">
-                                        <strong style="color:#666;font-size:14px;">时间</strong>
-                                    </td>
-                                    <td style="padding:10px 0;border-bottom:1px solid #eee;text-align:right;color:#333;font-size:14px;">'"$(date '+%Y-%m-%d %H:%M:%S')"'</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding:10px 0;border-bottom:1px solid #eee;">
-                                        <strong style="color:#666;font-size:14px;">消息</strong>
-                                    </td>
-                                    <td style="padding:10px 0;border-bottom:1px solid #eee;text-align:right;color:#333;font-size:14px;">'"$message"'</td>
-                                </tr>
-                                '"$(if [ -n "$details" ]; then echo '<tr><td style="padding:10px 0;" colspan="2"><pre style="background-color:#f9f9f9;padding:15px;border-radius:4px;font-size:12px;overflow-x:auto;color:#333;line-height:1.5;">'"$details"'</pre></td></tr>'; fi)"'
                             </table>
                         </td>
                     </tr>
                     <tr>
-                        <td style="background-color:#fafafa;padding:15px;text-align:center;border-top:1px solid #eee;">
-                            <p style="margin:0;color:#999;font-size:12px;">此邮件由 SD-UI 自动部署系统发送</p>
+                        <td style="padding:28px 32px;">
+                            <div style="margin-bottom:20px;">
+                                <div style="font-size:13px;color:#6B7280;margin-bottom:6px;">消息</div>
+                                <div style="font-size:16px;color:#F3F4F6;font-weight:500;">${message}</div>
+                            </div>
+                            <div style="margin-bottom:20px;">
+                                <div style="font-size:13px;color:#6B7280;margin-bottom:6px;">时间</div>
+                                <div style="font-size:14px;color:#D1D5DB;">'"$(date '+%Y-%m-%d %H:%M:%S')"'</div>
+                            </div>
+                            '"$commit_html"'
+                            '"$files_html"'
+                            '"$details_html"'
+                            '"$version_html"'
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:20px 32px;background:#111827;border-top:1px solid #374151;">
+                            <div style="text-align:center;">
+                                <span style="font-size:12px;color:#4B5563;">此邮件由 SD-UI 热部署系统发送</span>
+                            </div>
                         </td>
                     </tr>
                 </table>
@@ -268,7 +473,7 @@ send_deployment_notification() {
 </body>
 </html>'
 
-    send_email "SD-UI 热部署$status_text" "$html_body"
+    send_email "SD-UI 热部署${status_text}" "$html_body"
 }
 
 backup_database() {
@@ -420,6 +625,10 @@ run_prisma_migrate() {
     fi
 }
 
+DEPLOY_RESULT="success"
+DEPLOY_MESSAGE="热部署完成"
+DEPLOY_DETAILS=""
+
 log "=== Starting hot deployment ==="
 
 cd "$APP_DIR"
@@ -436,14 +645,20 @@ backup_database
 detect_and_install_npm_deps
 
 if ! run_npm_install; then
+    DEPLOY_RESULT="error"
+    DEPLOY_MESSAGE="依赖安装失败"
+    DEPLOY_DETAILS="npm install 失败，请检查日志: $LOG_FILE"
     log "ERROR: npm install failed after retry"
-    notify "error" "依赖安装失败" "npm install 失败，请检查日志"
+    notify "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
     exit 1
 fi
 
 if ! run_prisma_generate; then
+    DEPLOY_RESULT="error"
+    DEPLOY_MESSAGE="Prisma 生成失败"
+    DEPLOY_DETAILS="npx prisma generate 失败，请检查日志: $LOG_FILE"
     log "ERROR: Prisma generate failed"
-    notify "error" "Prisma 生成失败" "npx prisma generate 失败，请检查日志"
+    notify "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
     exit 1
 fi
 
@@ -465,8 +680,11 @@ if [ $build_exit_code -ne 0 ]; then
     fi
 
     if [ $build_exit_code -ne 0 ]; then
+        DEPLOY_RESULT="error"
+        DEPLOY_MESSAGE="构建失败"
+        DEPLOY_DETAILS="npm run build 失败 (退出码: $build_exit_code)，请检查日志: $LOG_FILE"
         log "ERROR: Build failed after retry"
-        notify "error" "构建失败" "npm run build 失败，请检查日志"
+        notify "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
         exit 1
     fi
 fi
@@ -542,5 +760,26 @@ systemctl --user restart sd-ui 2>/dev/null || {
     systemctl --user restart sd-ui || true
 }
 
-log "=== Hot deployment complete ==="
-notify "success" "热部署完成" "所有步骤执行成功，服务已重启"
+sleep 3
+
+if check_service_health; then
+    DEPLOY_DETAILS="所有步骤执行成功，服务已重启并通过健康检查"
+else
+    DEPLOY_RESULT="warning"
+    DEPLOY_MESSAGE="热部署完成（服务健康检查未通过）"
+    DEPLOY_DETAILS="服务已重启但健康检查未通过，请手动检查服务状态"
+fi
+
+if [ -n "$HEALTH_ISSUES" ]; then
+    DEPLOY_DETAILS="$DEPLOY_DETAILS | 健康检查修复的问题: $HEALTH_ISSUES"
+fi
+
+save_version
+
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+
+record_stats "$DEPLOY_RESULT" "$DURATION" "$(git rev-parse HEAD 2>/dev/null || echo 'unknown')" "$HEALTH_ISSUES"
+
+log "=== Hot deployment complete (duration: ${DURATION}s) ==="
+notify "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"

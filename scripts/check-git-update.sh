@@ -6,9 +6,131 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="$REPO_DIR/ui"
 LOG_DIR="${HOME}/.local/share/sd-ui/logs"
 GIT_LOG="$LOG_DIR/git-pull.log"
-STATIC_SYNC="$SCRIPT_DIR/sync-standalone-static.mjs"
+HEALTH_CHECK_LOG="$LOG_DIR/health-check.log"
+LOCK_FILE="/tmp/sd-ui-check-git.lock"
+VERSION_FILE="$LOG_DIR/.current_version"
+STATS_FILE="$LOG_DIR/deploy_stats.json"
+LATEST_HASH_FILE="$LOG_DIR/.last_commit_hash"
+LAST_STATUS_FILE="$LOG_DIR/.last_deploy_status"
 
 mkdir -p "$LOG_DIR"
+
+acquire_lock() {
+    if [ -f "$LOCK_FILE" ]; then
+        local pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Another instance is running (PID: $pid), exiting" >> "$GIT_LOG"
+            exit 0
+        fi
+        rm -f "$LOCK_FILE"
+    fi
+    echo $$ > "$LOCK_FILE"
+    trap "rm -f $LOCK_FILE" EXIT
+}
+
+rotate_logs() {
+    local max_size_mb=10
+    local max_backups=5
+    
+    for log in "$LOG_DIR"/*.log; do
+        [ -f "$log" ] || continue
+        
+        local size_kb=$(du -k "$log" 2>/dev/null | cut -f1)
+        local size_mb=$((size_kb / 1024))
+        
+        if [ "$size_mb" -ge "$max_size_mb" ]; then
+            local timestamp=$(date +%Y%m%d_%H%M%S)
+            local backup="${log%.*}.${timestamp}.bak"
+            mv "$log" "$backup"
+            gzip "$backup" 2>/dev/null || true
+            
+            local backups=($(ls -t "${log%.*}".*.bak.gz 2>/dev/null || true))
+            if [ ${#backups[@]} -gt "$max_backups" ]; then
+                for ((i=max_backups; i<${#backups[@]}; i++)); do
+                    rm -f "${backups[$i]}"
+                done
+            fi
+            
+            touch "$log"
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Log rotated from $backup" >> "$log"
+        fi
+    done
+}
+
+record_stats() {
+    local status="$1"
+    local duration="$2"
+    local commit="${3:-unknown}"
+    local issues="${4:-}"
+    
+    local stat_entry=$(cat <<EOF
+{"timestamp":"$(date -Iseconds)","status":"$status","duration":$duration,"commit":"$commit","issues":"$issues"}
+EOF
+)
+    echo "$stat_entry" >> "$STATS_FILE"
+    
+    local lines=$(wc -l < "$STATS_FILE" 2>/dev/null || echo "0")
+    if [ "$lines" -gt 100 ]; then
+        tail -100 "$STATS_FILE" > "${STATS_FILE}.tmp"
+        mv "${STATS_FILE}.tmp" "$STATS_FILE"
+    fi
+}
+
+save_version() {
+    local commit=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+    echo "$commit" > "$VERSION_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Version saved: $commit" >> "$GIT_LOG"
+}
+
+get_current_version() {
+    cat "$VERSION_FILE" 2>/dev/null || echo "unknown"
+}
+
+validate_env() {
+    local missing=()
+    
+    if [ -z "${DATABASE_URL:-}" ]; then
+        missing+=("DATABASE_URL")
+    fi
+    if [ -z "${RESEND_API_KEY:-}" ]; then
+        missing+=("RESEND_API_KEY")
+    fi
+    if [ -z "${EMAIL_FROM:-}" ]; then
+        missing+=("EMAIL_FROM")
+    fi
+    if [ -z "${EMAIL_TO:-}" ]; then
+        missing+=("EMAIL_TO")
+    fi
+    
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Missing required env vars: ${missing[*]}" >> "$GIT_LOG"
+        return 1
+    fi
+    return 0
+}
+
+check_service_health() {
+    local max_retries=30
+    local retry=0
+    local port="${PORT:-3001}"
+    
+    while [ $retry -lt $max_retries ]; do
+        if curl -sf "http://localhost:$port/" > /dev/null 2>&1; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Service health check passed" >> "$HEALTH_CHECK_LOG"
+            return 0
+        fi
+        sleep 1
+        ((retry++))
+    done
+    
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Service health check failed after ${max_retries}s" >> "$HEALTH_CHECK_LOG"
+    return 1
+}
+
+acquire_lock
+rotate_logs
+
+START_TIME=$(date +%s)
 
 if [ -f "$APP_DIR/.env" ]; then
     set -a
@@ -16,12 +138,10 @@ if [ -f "$APP_DIR/.env" ]; then
     set +a
 fi
 
-if [ -z "${RESEND_API_KEY:-}" ] || [ -z "${EMAIL_FROM:-}" ] || [ -z "${EMAIL_TO:-}" ]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error: Missing environment variables (RESEND_API_KEY, EMAIL_FROM, EMAIL_TO)" >> "$GIT_LOG"
+if ! validate_env; then
+    notify "error" "环境变量缺失" "缺少必要的环境变量，请检查 .env 文件" "" "" ""
     exit 1
 fi
-
-HEALTH_CHECK_LOG="$LOG_DIR/health-check.log"
 
 health_check() {
     local issues=()
@@ -141,12 +261,13 @@ health_check() {
     fi
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Health Check End (Repaired) ===" >> "$HEALTH_CHECK_LOG"
+    
+    HEALTH_ISSUES="${issues[*]}"
     return 0
 }
 
+HEALTH_ISSUES=""
 health_check
-
-LAST_STATUS_FILE="$LOG_DIR/.last_deploy_status"
 
 get_last_status() {
     if [ -f "$LAST_STATUS_FILE" ]; then
@@ -171,6 +292,7 @@ notify() {
     local commit_title="${3:-}"
     local commit_body="${4:-}"
     local changed_files="${5:-}"
+    local extra_details="${6:-}"
 
     if [ "$status" = "error" ] && ! should_send_failure_notification; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Failure notification suppressed (already notified)" >> "$GIT_LOG"
@@ -178,7 +300,7 @@ notify() {
         return 0
     fi
 
-    send_deployment_notification "$status" "$message" "$commit_title" "$commit_body" "$changed_files"
+    send_deployment_notification "$status" "$message" "$commit_title" "$commit_body" "$changed_files" "$extra_details"
     save_status "$status"
 }
 
@@ -204,6 +326,7 @@ send_deployment_notification() {
     local commit_title="$3"
     local commit_body="$4"
     local changed_files="$5"
+    local extra_details="$6"
 
     local status_color="#10B981"
     local status_bg="#ECFDF5"
@@ -219,6 +342,12 @@ send_deployment_notification() {
         status_color="#F59E0B"
         status_bg="#FFFBEB"
         card_border="#92400E"
+        status_text="警告"
+    elif [ "$status" = "health_repaired" ]; then
+        status_color="#3B82F6"
+        status_bg="#EFF6FF"
+        status_text="自愈"
+        card_border="#1E40AF"
     fi
 
     local files_html=""
@@ -253,6 +382,20 @@ send_deployment_notification() {
             commit_html="${commit_html}<div style='font-size:13px;color:#9CA3AF;line-height:1.6;white-space:pre-wrap;'>${commit_body}</div>"
         fi
         commit_html="${commit_html}</div></div>"
+    fi
+
+    local details_html=""
+    if [ -n "$extra_details" ]; then
+        details_html="<div style='margin-top:20px;'>
+            <div style='font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;'>详细信息</div>
+            <div style='background:#1F2937;border-radius:8px;padding:16px;font-size:13px;color:#D1D5DB;line-height:1.6;white-space:pre-wrap;'>${extra_details}</div>
+        </div>"
+    fi
+
+    local current_version=$(get_current_version)
+    local version_html=""
+    if [ "$current_version" != "unknown" ]; then
+        version_html="<div style='margin-top:12px;font-size:12px;color:#6B7280;'>当前版本: ${current_version:0:8}</div>"
     fi
 
     local html_body='<!DOCTYPE html>
@@ -304,6 +447,8 @@ send_deployment_notification() {
                             </div>
                             '"$commit_html"'
                             '"$files_html"'
+                            '"$details_html"'
+                            '"$version_html"'
                         </td>
                     </tr>
                     <tr>
@@ -320,7 +465,7 @@ send_deployment_notification() {
 </body>
 </html>'
 
-    send_email "SD-UI 部署$status_text" "$html_body"
+    send_email "SD-UI 部署${status_text}" "$html_body"
 }
 
 ensure_scripts_executable() {
@@ -328,9 +473,11 @@ ensure_scripts_executable() {
     chmod +x "$REPO_DIR"/scripts/*.sh 2>/dev/null || true
 }
 
-cd "$APP_DIR"
+if [ -n "$HEALTH_ISSUES" ]; then
+    notify "health_repaired" "系统自愈完成" "" "" "" "检测并修复的问题: $HEALTH_ISSUES"
+fi
 
-LATEST_HASH_FILE="$LOG_DIR/.last_commit_hash"
+cd "$APP_DIR"
 
 git fetch origin
 REMOTE_HASH=$(git rev-parse origin/main 2>/dev/null || echo "")
@@ -338,7 +485,7 @@ LOCAL_HASH=$(git rev-parse HEAD 2>/dev/null || echo "")
 
 if [ -z "$LOCAL_HASH" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error: Not a git repository" >> "$GIT_LOG"
-    notify "error" "Git 仓库错误" "" "" ""
+    notify "error" "Git 仓库错误" "" "" "" "无法获取本地 commit hash"
     exit 1
 fi
 
@@ -356,7 +503,8 @@ if ! git rev-parse --verify --quiet HEAD@{u} 2>/dev/null; then
     }
     ensure_scripts_executable
     echo "$REMOTE_HASH" > "$LATEST_HASH_FILE"
-    notify "success" "首次部署完成" "" "" ""
+    save_version
+    notify "success" "首次部署完成" "" "" "" "新分支初始化完成"
     exit 0
 fi
 
@@ -383,7 +531,7 @@ if [ -n "$LOCAL_CHANGES" ]; then
         if [ "$HAS_STASH_CONTENT" = true ]; then
             git stash pop 2>&1 | tee -a "$GIT_LOG" || true
         fi
-        notify "error" "拉取失败" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES"
+        notify "error" "拉取失败" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "Git pull 失败，请检查网络或冲突"
         exit 1
     fi
 
@@ -402,7 +550,7 @@ else
     git pull origin main --ff-only 2>&1 | tee -a "$GIT_LOG" || {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset..." >> "$GIT_LOG"
         git reset --hard origin/main 2>&1 | tee -a "$GIT_LOG" || true
-        notify "warning" "强制同步" "" "" ""
+        notify "warning" "强制同步" "" "" "" "Git pull 失败，已执行硬重置"
     }
 fi
 
@@ -471,16 +619,34 @@ if [ "$RELEVANT_CHANGE" = false ]; then
     exit 0
 fi
 
+DEPLOY_RESULT="success"
+DEPLOY_MESSAGE=""
+DEPLOY_DETAILS=""
+
 if [ "$SCRIPTS_CHANGED" = true ] && [ "$BACKEND_CHANGED" = false ] && [ "$FRONTEND_ONLY" = false ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Only scripts changed, no restart needed" >> "$GIT_LOG"
-    notify "success" "脚本已更新" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES"
+    DEPLOY_MESSAGE="脚本已更新"
+    DEPLOY_DETAILS="部署脚本有更新，健康检查已执行"
+    notify "success" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
 elif [ "$BACKEND_CHANGED" = true ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backend/API changes detected, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
         "$SCRIPT_DIR/hot-deploy.sh"
+        DEPLOY_EXIT=$?
+        if [ $DEPLOY_EXIT -ne 0 ]; then
+            DEPLOY_RESULT="error"
+            DEPLOY_MESSAGE="热部署失败"
+            DEPLOY_DETAILS="hot-deploy.sh 退出码: $DEPLOY_EXIT"
+        else
+            DEPLOY_MESSAGE="热部署完成"
+            DEPLOY_DETAILS="后端/API 变更已部署"
+        fi
     else
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] hot-deploy.sh not found or not executable" >> "$GIT_LOG"
-        notify "error" "部署脚本错误" "" "" ""
+        DEPLOY_RESULT="error"
+        DEPLOY_MESSAGE="部署脚本错误"
+        DEPLOY_DETAILS="hot-deploy.sh 不存在或不可执行"
+        notify "error" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
         exit 1
     fi
 elif [ "$FRONTEND_ONLY" = true ]; then
@@ -489,15 +655,24 @@ elif [ "$FRONTEND_ONLY" = true ]; then
     npm install >> "$GIT_LOG" 2>&1
     npx prisma generate >> "$GIT_LOG" 2>&1
     npm run build >> "$GIT_LOG" 2>&1
+    BUILD_EXIT=$?
+
+    if [ $BUILD_EXIT -ne 0 ]; then
+        DEPLOY_RESULT="error"
+        DEPLOY_MESSAGE="前端构建失败"
+        DEPLOY_DETAILS="npm run build 退出码: $BUILD_EXIT"
+        notify "error" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
+        exit 1
+    fi
 
     if [ -f "$APP_DIR/scripts/sync-standalone-static.mjs" ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Syncing static files..." >> "$GIT_LOG"
         node "$APP_DIR/scripts/sync-standalone-static.mjs" >> "$GIT_LOG" 2>&1 || true
     fi
 
-    local standalone_dir="$APP_DIR/.next/standalone"
-    local public_src="$APP_DIR/public"
-    local public_dest="$standalone_dir/public"
+    standalone_dir="$APP_DIR/.next/standalone"
+    public_src="$APP_DIR/public"
+    public_dest="$standalone_dir/public"
 
     if [ -d "$standalone_dir" ] && [ -d "$public_src" ]; then
         mkdir -p "$public_dest"
@@ -506,8 +681,10 @@ elif [ "$FRONTEND_ONLY" = true ]; then
     fi
 
     systemctl --user restart sd-ui 2>/dev/null || true
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend rebuilt successfully (no restart - Next.js hot reload handles it)" >> "$GIT_LOG"
-    notify "success" "前端更新完成" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend rebuilt successfully" >> "$GIT_LOG"
+    DEPLOY_MESSAGE="前端更新完成"
+    DEPLOY_DETAILS="前端变更已构建并重启服务"
+    notify "success" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
 else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generic update, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
@@ -515,4 +692,11 @@ else
     fi
 fi
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Update complete" >> "$GIT_LOG"
+save_version
+
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+
+record_stats "$DEPLOY_RESULT" "$DURATION" "$REMOTE_HASH" "$HEALTH_ISSUES"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Update complete (duration: ${DURATION}s)" >> "$GIT_LOG"
