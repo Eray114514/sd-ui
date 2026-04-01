@@ -1,0 +1,15 @@
+#!/bin/bash
+
+LOG_DIR="${HOME}/.local/share/sd-ui/logs"
+BACKUP_DIR="${HOME}/.local/share/sd-ui/backups"
+STATE_DIR="${HOME}/.local/share/sd-ui/state"
+LOCK_DIR="/tmp"
+
+MAX_LOG_SIZE_MB=10
+MAX_LOG_BACKUPS=5
+MAX_DB_BACKUPS=5
+MAX_DEPLOY_STATS=100
+SHUTDOWN_TIMEOUT=30
+PORT=3001
+SERVICE_NAME="sd-ui"
+GIT_BRANCH="main"
