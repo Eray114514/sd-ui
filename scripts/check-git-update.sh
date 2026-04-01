@@ -321,7 +321,7 @@ elif [ "$BACKEND_CHANGED" = true ]; then
         exit 1
     fi
 elif [ "$FRONTEND_ONLY" = true ]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend only changes, rebuilding without restart..." >> "$GIT_LOG"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend only changes, rebuilding and restarting..." >> "$GIT_LOG"
 
     if check_dependencies_changed "$LOCAL_HASH" "$REMOTE_HASH"; then
         npm install >> "$GIT_LOG" 2>&1
@@ -353,8 +353,9 @@ elif [ "$FRONTEND_ONLY" = true ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public files synced" >> "$GIT_LOG"
     fi
 
+    wait_for_processing_tasks
     systemctl --user restart "$SERVICE_NAME" 2>/dev/null || true
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend rebuilt successfully" >> "$GIT_LOG"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend rebuilt and restarted successfully" >> "$GIT_LOG"
     DEPLOY_MESSAGE="前端更新完成"
     DEPLOY_DETAILS="前端变更已构建并重启服务"
     notify "$GIT_LOG" "success" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"

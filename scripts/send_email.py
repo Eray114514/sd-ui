@@ -281,19 +281,6 @@ def send_email_with_urllib(api_key, email_from, email_to, subject, html_body):
 
 def send_email(subject, status, message, commit_title="", commit_body="", changed_files="", extra_details="", current_version="unknown"):
     """发送邮件通知"""
-    env_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ui", ".env")
-    if os.path.exists(env_file):
-        with open(env_file, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    if "=" in line:
-                        key, value = line.split("=", 1)
-                        key = key.strip()
-                        value = value.strip().strip('"')
-                        if key not in os.environ:
-                            os.environ[key] = value
-
     api_key = os.environ.get("RESEND_API_KEY")
     email_from = os.environ.get("EMAIL_FROM")
     email_to = os.environ.get("EMAIL_TO")
