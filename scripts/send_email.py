@@ -2,9 +2,18 @@
 import os
 import sys
 import json
-import urllib.request
-import urllib.error
 from datetime import datetime
+
+# 尝试导入官方 Resend SDK
+try:
+    import resend
+except ImportError:
+    # 如果 SDK 未安装，使用 urllib 作为备选
+    import urllib.request
+    import urllib.error
+    use_sdk = False
+else:
+    use_sdk = True
 
 def generate_email_html(status, message, commit_title="", commit_body="", changed_files="", extra_details="", current_version="unknown"):
     """生成邮件HTML内容"""
@@ -145,6 +154,69 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
 </html>'''
     return html_body
 
+def send_email_with_sdk(api_key, email_from, email_to, subject, html_body):
+    """使用官方 SDK 发送邮件"""
+    try:
+        resend.api_key = api_key
+        params = {
+            "from": email_from,
+            "to": [email_to],
+            "subject": subject,
+            "html": html_body
+        }
+        response = resend.Emails.send(params)
+        print(f"Email sent successfully (SDK): {response.get('id', 'unknown')}")
+        return True
+    except Exception as e:
+        print(f"SDK Error: {e}")
+        return False
+
+def send_email_with_urllib(api_key, email_from, email_to, subject, html_body):
+    """使用 urllib 发送邮件"""
+    data = {
+        "from": email_from,
+        "to": [email_to],
+        "subject": subject,
+        "html": html_body
+    }
+
+    try:
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=json.dumps(data).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json; charset=utf-8"
+            },
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req, timeout=30) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            print(f"Email sent successfully (urllib): {result.get('id', 'unknown')}")
+            return True
+
+    except urllib.error.HTTPError as e:
+        error_raw = ""
+        error_body = None
+        try:
+            error_raw = e.read().decode("utf-8")
+            if error_raw.strip():
+                error_body = json.loads(error_raw)
+        except Exception:
+            pass
+        if error_body:
+            print(f"HTTP Error {e.code}: {json.dumps(error_body, ensure_ascii=False)}")
+        else:
+            print(f"HTTP Error {e.code}: {error_raw if error_raw else '(empty response)'}")
+        return False
+    except json.JSONDecodeError as e:
+        print(f"JSON Decode Error: {e}")
+        return False
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
 def send_email(subject, status, message, commit_title="", commit_body="", changed_files="", extra_details="", current_version="unknown"):
     """发送邮件通知"""
     # 尝试从环境变量文件加载
@@ -175,49 +247,11 @@ def send_email(subject, status, message, commit_title="", commit_body="", change
     # 生成HTML内容
     html_body = generate_email_html(status, message, commit_title, commit_body, changed_files, extra_details, current_version)
 
-    data = {
-        "from": email_from,
-        "to": [email_to],
-        "subject": subject,
-        "html": html_body
-    }
-
-    try:
-        req = urllib.request.Request(
-            "https://api.resend.com/emails",
-            data=json.dumps(data).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json; charset=utf-8"
-            },
-            method="POST"
-        )
-
-        with urllib.request.urlopen(req, timeout=30) as response:
-            result = json.loads(response.read().decode("utf-8"))
-            print(f"Email sent successfully: {result.get('id', 'unknown')}")
-            return True
-
-    except urllib.error.HTTPError as e:
-        error_raw = ""
-        error_body = None
-        try:
-            error_raw = e.read().decode("utf-8")
-            if error_raw.strip():
-                error_body = json.loads(error_raw)
-        except Exception:
-            pass
-        if error_body:
-            print(f"HTTP Error {e.code}: {json.dumps(error_body, ensure_ascii=False)}")
-        else:
-            print(f"HTTP Error {e.code}: {error_raw if error_raw else '(empty response)'}")
-        return False
-    except json.JSONDecodeError as e:
-        print(f"JSON Decode Error: {e}")
-        return False
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
+    # 根据是否安装了 SDK 选择发送方式
+    if use_sdk:
+        return send_email_with_sdk(api_key, email_from, email_to, subject, html_body)
+    else:
+        return send_email_with_urllib(api_key, email_from, email_to, subject, html_body)
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
