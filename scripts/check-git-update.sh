@@ -56,7 +56,10 @@ health_check() {
 
     if [ -f "$APP_DIR/prisma/schema.prisma" ]; then
         cd "$APP_DIR"
-        if ! DATABASE_URL="file:./prisma/dev.db" npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
+        if [ ! -f "$APP_DIR/prisma/dev.db" ]; then
+            issues+=("database missing")
+            echo "[Health] database missing, need db push" >> "$HEALTH_CHECK_LOG"
+        elif ! DATABASE_URL="file:./prisma/dev.db" npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
             issues+=("prisma migration pending")
             echo "[Health] prisma migration pending or failed" >> "$HEALTH_CHECK_LOG"
         fi
@@ -73,6 +76,7 @@ health_check() {
 
     local need_rebuild=false
     local need_migrate=false
+    local need_db_push=false
 
     for issue in "${issues[@]}"; do
         case "$issue" in
@@ -81,6 +85,9 @@ health_check() {
                 ;;
             "prisma migration pending")
                 need_migrate=true
+                ;;
+            "database missing")
+                need_db_push=true
                 ;;
         esac
     done
@@ -124,6 +131,14 @@ health_check() {
         done
     fi
 
+    if [ "$need_db_push" = true ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Running prisma db push..." >> "$GIT_LOG"
+        cd "$APP_DIR"
+        DATABASE_URL="file:./prisma/dev.db" npx prisma db push >> "$HEALTH_CHECK_LOG" 2>&1 || true
+        cd "$REPO_DIR"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Database push complete" >> "$GIT_LOG"
+    fi
+
     if [ "$need_migrate" = true ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Running prisma migrate deploy..." >> "$GIT_LOG"
         cd "$APP_DIR"
@@ -132,7 +147,7 @@ health_check() {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Migration complete" >> "$GIT_LOG"
     fi
 
-    if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ]; then
+    if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Restarting service..." >> "$GIT_LOG"
         systemctl --user restart "$SERVICE_NAME" 2>/dev/null || true
     fi

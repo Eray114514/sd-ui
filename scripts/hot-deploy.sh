@@ -59,7 +59,10 @@ health_check() {
 
     if [ -f "$APP_DIR/prisma/schema.prisma" ]; then
         cd "$APP_DIR"
-        if ! DATABASE_URL="file:./prisma/dev.db" npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
+        if [ ! -f "$APP_DIR/prisma/dev.db" ]; then
+            issues+=("database missing")
+            echo "[Health] database missing, need db push" >> "$HEALTH_CHECK_LOG"
+        elif ! DATABASE_URL="file:./prisma/dev.db" npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
             issues+=("prisma migration pending")
             echo "[Health] prisma migration pending or failed" >> "$HEALTH_CHECK_LOG"
         fi
@@ -75,6 +78,7 @@ health_check() {
 
     local need_rebuild=false
     local need_migrate=false
+    local need_db_push=false
 
     for issue in "${issues[@]}"; do
         case "$issue" in
@@ -83,6 +87,9 @@ health_check() {
                 ;;
             "prisma migration pending")
                 need_migrate=true
+                ;;
+            "database missing")
+                need_db_push=true
                 ;;
         esac
     done
@@ -126,6 +133,14 @@ health_check() {
         done
     fi
 
+    if [ "$need_db_push" = true ]; then
+        log "$LOG_FILE" "Health repair: Running prisma db push..."
+        cd "$APP_DIR"
+        DATABASE_URL="file:./prisma/dev.db" npx prisma db push >> "$HEALTH_CHECK_LOG" 2>&1 || true
+        cd "$REPO_DIR"
+        log "$LOG_FILE" "Health repair: Database push complete"
+    fi
+
     if [ "$need_migrate" = true ]; then
         log "$LOG_FILE" "Health repair: Running prisma migrate deploy..."
         cd "$APP_DIR"
@@ -134,7 +149,7 @@ health_check() {
         log "$LOG_FILE" "Health repair: Migration complete"
     fi
 
-    if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ]; then
+    if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
         log "$LOG_FILE" "Health repair: Restarting service..."
         systemctl --user restart "$SERVICE_NAME" 2>/dev/null || true
     fi
