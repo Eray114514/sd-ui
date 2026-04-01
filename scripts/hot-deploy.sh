@@ -59,7 +59,7 @@ health_check() {
 
     if [ -f "$APP_DIR/prisma/schema.prisma" ]; then
         cd "$APP_DIR"
-        if ! npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
+        if ! DATABASE_URL="file:./prisma/dev.db" npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
             issues+=("prisma migration pending")
             echo "[Health] prisma migration pending or failed" >> "$HEALTH_CHECK_LOG"
         fi
@@ -129,7 +129,7 @@ health_check() {
     if [ "$need_migrate" = true ]; then
         log "$LOG_FILE" "Health repair: Running prisma migrate deploy..."
         cd "$APP_DIR"
-        npx prisma migrate deploy >> "$HEALTH_CHECK_LOG" 2>&1 || true
+        DATABASE_URL="file:./prisma/dev.db" npx prisma migrate deploy >> "$HEALTH_CHECK_LOG" 2>&1 || true
         cd "$REPO_DIR"
         log "$LOG_FILE" "Health repair: Migration complete"
     fi
@@ -273,12 +273,12 @@ run_prisma_migrate() {
     log "$LOG_FILE" "Running database migrations..."
 
     if [ -d "$APP_DIR/prisma/migrations" ] && [ -n "$(ls -A "$APP_DIR/prisma/migrations" 2>/dev/null)" ]; then
-        npx prisma migrate deploy >> "$LOG_FILE" 2>&1
+        DATABASE_URL="file:./prisma/dev.db" npx prisma migrate deploy >> "$LOG_FILE" 2>&1
         local exit_code=$?
 
         if [ $exit_code -ne 0 ]; then
             log "$LOG_FILE" "Migration failed, attempting to resolve..."
-            npx prisma migrate resolve --applied 2>&1 | tee -a "$LOG_FILE" || true
+            DATABASE_URL="file:./prisma/dev.db" npx prisma migrate resolve --applied 2>&1 | tee -a "$LOG_FILE" || true
         fi
     else
         log "$LOG_FILE" "No migrations directory found or empty, running db push instead..."

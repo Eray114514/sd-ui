@@ -56,7 +56,7 @@ health_check() {
 
     if [ -f "$APP_DIR/prisma/schema.prisma" ]; then
         cd "$APP_DIR"
-        if ! npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
+        if ! DATABASE_URL="file:./prisma/dev.db" npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
             issues+=("prisma migration pending")
             echo "[Health] prisma migration pending or failed" >> "$HEALTH_CHECK_LOG"
         fi
@@ -127,7 +127,7 @@ health_check() {
     if [ "$need_migrate" = true ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Running prisma migrate deploy..." >> "$GIT_LOG"
         cd "$APP_DIR"
-        npx prisma migrate deploy >> "$HEALTH_CHECK_LOG" 2>&1 || true
+        DATABASE_URL="file:./prisma/dev.db" npx prisma migrate deploy >> "$HEALTH_CHECK_LOG" 2>&1 || true
         cd "$REPO_DIR"
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Migration complete" >> "$GIT_LOG"
     fi
