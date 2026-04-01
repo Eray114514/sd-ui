@@ -59,10 +59,11 @@ health_check() {
 
     if [ -f "$APP_DIR/prisma/schema.prisma" ]; then
         cd "$APP_DIR"
-        if [ ! -f "$APP_DIR/prisma/dev.db" ]; then
+        local db_path="${DATABASE_URL#file:}"
+        if [ ! -f "$db_path" ] && [ ! -f "$APP_DIR/$db_path" ]; then
             issues+=("database missing")
             echo "[Health] database missing, need db push" >> "$HEALTH_CHECK_LOG"
-        elif ! DATABASE_URL="file:./prisma/dev.db" npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
+        elif ! npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
             issues+=("prisma migration pending")
             echo "[Health] prisma migration pending or failed" >> "$HEALTH_CHECK_LOG"
         fi
@@ -136,7 +137,7 @@ health_check() {
     if [ "$need_db_push" = true ]; then
         log "$LOG_FILE" "Health repair: Running prisma db push..."
         cd "$APP_DIR"
-        DATABASE_URL="file:./prisma/dev.db" npx prisma db push >> "$HEALTH_CHECK_LOG" 2>&1 || true
+        npx prisma db push >> "$HEALTH_CHECK_LOG" 2>&1 || true
         cd "$REPO_DIR"
         log "$LOG_FILE" "Health repair: Database push complete"
     fi
@@ -144,7 +145,7 @@ health_check() {
     if [ "$need_migrate" = true ]; then
         log "$LOG_FILE" "Health repair: Running prisma migrate deploy..."
         cd "$APP_DIR"
-        DATABASE_URL="file:./prisma/dev.db" npx prisma migrate deploy >> "$HEALTH_CHECK_LOG" 2>&1 || true
+        npx prisma migrate deploy >> "$HEALTH_CHECK_LOG" 2>&1 || true
         cd "$REPO_DIR"
         log "$LOG_FILE" "Health repair: Migration complete"
     fi
@@ -286,19 +287,24 @@ run_prisma_generate() {
 
 run_prisma_migrate() {
     log "$LOG_FILE" "Running database migrations..."
+    cd "$APP_DIR"
 
     if [ -d "$APP_DIR/prisma/migrations" ] && [ -n "$(ls -A "$APP_DIR/prisma/migrations" 2>/dev/null)" ]; then
-        DATABASE_URL="file:./prisma/dev.db" npx prisma migrate deploy >> "$LOG_FILE" 2>&1
+        npx prisma migrate deploy >> "$LOG_FILE" 2>&1
         local exit_code=$?
 
         if [ $exit_code -ne 0 ]; then
             log "$LOG_FILE" "Migration failed, attempting to resolve..."
-            DATABASE_URL="file:./prisma/dev.db" npx prisma migrate resolve --applied 2>&1 | tee -a "$LOG_FILE" || true
+            npx prisma migrate resolve --applied 2>&1 | tee -a "$LOG_FILE" || true
         fi
     else
-        log "$LOG_FILE" "No migrations directory found or empty, running db push instead..."
-        DATABASE_URL="file:./prisma/dev.db" npx prisma db push >> "$LOG_FILE" 2>&1 || true
+        log "$LOG_FILE" "No migrations folder found, using db push instead..."
+        npx prisma db push >> "$LOG_FILE" 2>&1
+        local exit_code=$?
     fi
+
+    cd "$REPO_DIR"
+    return $exit_code
 }
 
 sync_public_files() {
