@@ -9,5 +9,8 @@ node_modules/
 logs/
 *.log
 
+# Deploy config (local overrides)
+.deployrc
+
 # Database backups
 ui/prisma/backups/
