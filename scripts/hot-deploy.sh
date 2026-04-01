@@ -63,9 +63,11 @@ health_check() {
         if [ ! -f "$db_path" ] && [ ! -f "$APP_DIR/$db_path" ]; then
             issues+=("database missing")
             echo "[Health] database missing, need db push" >> "$HEALTH_CHECK_LOG"
-        elif ! npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
-            issues+=("prisma migration pending")
-            echo "[Health] prisma migration pending or failed" >> "$HEALTH_CHECK_LOG"
+        elif [ -d "$APP_DIR/prisma/migrations" ] && [ -n "$(ls -A "$APP_DIR/prisma/migrations" 2>/dev/null)" ]; then
+            if ! npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
+                issues+=("prisma migration pending")
+                echo "[Health] prisma migration pending or failed" >> "$HEALTH_CHECK_LOG"
+            fi
         fi
         cd "$REPO_DIR"
     fi

@@ -60,9 +60,11 @@ health_check() {
         if [ ! -f "$db_path" ] && [ ! -f "$APP_DIR/$db_path" ]; then
             issues+=("database missing")
             echo "[Health] database missing, need db push" >> "$HEALTH_CHECK_LOG"
-        elif ! npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
-            issues+=("prisma migration pending")
-            echo "[Health] prisma migration pending or failed" >> "$HEALTH_CHECK_LOG"
+        elif [ -d "$APP_DIR/prisma/migrations" ] && [ -n "$(ls -A "$APP_DIR/prisma/migrations" 2>/dev/null)" ]; then
+            if ! npx prisma migrate status >> "$HEALTH_CHECK_LOG" 2>&1; then
+                issues+=("prisma migration pending")
+                echo "[Health] prisma migration pending or failed" >> "$HEALTH_CHECK_LOG"
+            fi
         fi
         cd "$REPO_DIR"
     fi
@@ -176,6 +178,12 @@ if [ -z "$LOCAL_HASH" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error: Not a git repository" >> "$GIT_LOG"
     notify "$GIT_LOG" "error" "Git 仓库错误" "" "" "" "无法获取本地 commit hash"
     exit 1
+fi
+
+CURRENT_VERSION=$(get_current_version)
+if [ "$LOCAL_HASH" != "$CURRENT_VERSION" ] && [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected manual pull, updating version..." >> "$GIT_LOG"
+    save_version
 fi
 
 if [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
