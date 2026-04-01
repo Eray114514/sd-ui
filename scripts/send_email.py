@@ -2,18 +2,23 @@
 import os
 import sys
 import json
+import subprocess
 from datetime import datetime
 
 # 尝试导入官方 Resend SDK
 try:
     import resend
+    use_sdk = True
 except ImportError:
-    # 如果 SDK 未安装，使用 urllib 作为备选
+    use_sdk = False
+
+# 尝试导入 urllib
+try:
     import urllib.request
     import urllib.error
-    use_sdk = False
-else:
-    use_sdk = True
+    use_urllib = True
+except ImportError:
+    use_urllib = False
 
 def generate_email_html(status, message, commit_title="", commit_body="", changed_files="", extra_details="", current_version="unknown"):
     """生成邮件HTML内容"""
@@ -171,6 +176,46 @@ def send_email_with_sdk(api_key, email_from, email_to, subject, html_body):
         print(f"SDK Error: {e}")
         return False
 
+def send_email_with_curl(api_key, email_from, email_to, subject, html_body):
+    """使用 curl 发送邮件"""
+    data = {
+        "from": email_from,
+        "to": [email_to],
+        "subject": subject,
+        "html": html_body
+    }
+
+    try:
+        cmd = [
+            "curl",
+            "-s",
+            "-X", "POST",
+            "https://api.resend.com/emails",
+            "-H", f"Authorization: Bearer {api_key}",
+            "-H", "Content-Type: application/json; charset=utf-8",
+            "-d", json.dumps(data)
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            try:
+                response = json.loads(result.stdout)
+                print(f"Email sent successfully (curl): {response.get('id', 'unknown')}")
+                return True
+            except json.JSONDecodeError:
+                print(f"curl success but invalid JSON response: {result.stdout}")
+                return True
+        else:
+            print(f"curl failed with exit code {result.returncode}")
+            print(f"stderr: {result.stderr}")
+            print(f"stdout: {result.stdout}")
+            return False
+    except subprocess.TimeoutExpired:
+        print("curl timeout")
+        return False
+    except Exception as e:
+        print(f"curl error: {e}")
+        return False
+
 def send_email_with_urllib(api_key, email_from, email_to, subject, html_body):
     """使用 urllib 发送邮件"""
     data = {
@@ -186,7 +231,11 @@ def send_email_with_urllib(api_key, email_from, email_to, subject, html_body):
             data=json.dumps(data).encode("utf-8"),
             headers={
                 "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json; charset=utf-8"
+                "Content-Type": "application/json; charset=utf-8",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "*/*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Connection": "keep-alive"
             },
             method="POST"
         )
@@ -247,11 +296,31 @@ def send_email(subject, status, message, commit_title="", commit_body="", change
     # 生成HTML内容
     html_body = generate_email_html(status, message, commit_title, commit_body, changed_files, extra_details, current_version)
 
-    # 根据是否安装了 SDK 选择发送方式
+    # 优先使用官方 SDK
     if use_sdk:
-        return send_email_with_sdk(api_key, email_from, email_to, subject, html_body)
-    else:
-        return send_email_with_urllib(api_key, email_from, email_to, subject, html_body)
+        print("Trying to send email with Resend SDK...")
+        if send_email_with_sdk(api_key, email_from, email_to, subject, html_body):
+            return True
+        print("SDK failed, trying curl...")
+    
+    # 其次使用 curl
+    try:
+        print("Trying to send email with curl...")
+        if send_email_with_curl(api_key, email_from, email_to, subject, html_body):
+            return True
+        print("curl failed, trying urllib...")
+    except Exception as e:
+        print(f"curl setup failed: {e}")
+    
+    # 最后使用 urllib
+    if use_urllib:
+        print("Trying to send email with urllib...")
+        if send_email_with_urllib(api_key, email_from, email_to, subject, html_body):
+            return True
+    
+    # 所有方法都失败
+    print("All email sending methods failed")
+    return False
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
