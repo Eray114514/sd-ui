@@ -2,144 +2,21 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-APP_DIR="$REPO_DIR/ui"
-LOG_DIR="${HOME}/.local/share/sd-ui/logs"
+source "$SCRIPT_DIR/lib.sh"
+
+load_config
 GIT_LOG="$LOG_DIR/git-pull.log"
 HEALTH_CHECK_LOG="$LOG_DIR/health-check.log"
-LOCK_FILE="/tmp/sd-ui-check-git.lock"
-VERSION_FILE="$LOG_DIR/.current_version"
-STATS_FILE="$LOG_DIR/deploy_stats.json"
-LATEST_HASH_FILE="$LOG_DIR/.last_commit_hash"
-LAST_STATUS_FILE="$LOG_DIR/.last_deploy_status"
 
-mkdir -p "$LOG_DIR"
-
-acquire_lock() {
-    if [ -f "$LOCK_FILE" ]; then
-        local pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
-        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Another instance is running (PID: $pid), exiting" >> "$GIT_LOG"
-            exit 0
-        fi
-        rm -f "$LOCK_FILE"
-    fi
-    echo $$ > "$LOCK_FILE"
-    trap "rm -f $LOCK_FILE" EXIT
-}
-
-rotate_logs() {
-    local max_size_mb=10
-    local max_backups=5
-    
-    for log in "$LOG_DIR"/*.log; do
-        [ -f "$log" ] || continue
-        
-        local size_kb=$(du -k "$log" 2>/dev/null | cut -f1)
-        local size_mb=$((size_kb / 1024))
-        
-        if [ "$size_mb" -ge "$max_size_mb" ]; then
-            local timestamp=$(date +%Y%m%d_%H%M%S)
-            local backup="${log%.*}.${timestamp}.bak"
-            mv "$log" "$backup"
-            gzip "$backup" 2>/dev/null || true
-            
-            local backups=($(ls -t "${log%.*}".*.bak.gz 2>/dev/null || true))
-            if [ ${#backups[@]} -gt "$max_backups" ]; then
-                for ((i=max_backups; i<${#backups[@]}; i++)); do
-                    rm -f "${backups[$i]}"
-                done
-            fi
-            
-            touch "$log"
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Log rotated from $backup" >> "$log"
-        fi
-    done
-}
-
-record_stats() {
-    local status="$1"
-    local duration="$2"
-    local commit="${3:-unknown}"
-    local issues="${4:-}"
-    
-    local stat_entry=$(cat <<EOF
-{"timestamp":"$(date -Iseconds)","status":"$status","duration":$duration,"commit":"$commit","issues":"$issues"}
-EOF
-)
-    echo "$stat_entry" >> "$STATS_FILE"
-    
-    local lines=$(wc -l < "$STATS_FILE" 2>/dev/null || echo "0")
-    if [ "$lines" -gt 100 ]; then
-        tail -100 "$STATS_FILE" > "${STATS_FILE}.tmp"
-        mv "${STATS_FILE}.tmp" "$STATS_FILE"
-    fi
-}
-
-save_version() {
-    local commit=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
-    echo "$commit" > "$VERSION_FILE"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Version saved: $commit" >> "$GIT_LOG"
-}
-
-get_current_version() {
-    cat "$VERSION_FILE" 2>/dev/null || echo "unknown"
-}
-
-validate_env() {
-    local missing=()
-    
-    if [ -z "${DATABASE_URL:-}" ]; then
-        missing+=("DATABASE_URL")
-    fi
-    if [ -z "${RESEND_API_KEY:-}" ]; then
-        missing+=("RESEND_API_KEY")
-    fi
-    if [ -z "${EMAIL_FROM:-}" ]; then
-        missing+=("EMAIL_FROM")
-    fi
-    if [ -z "${EMAIL_TO:-}" ]; then
-        missing+=("EMAIL_TO")
-    fi
-    
-    if [ ${#missing[@]} -gt 0 ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Missing required env vars: ${missing[*]}" >> "$GIT_LOG"
-        return 1
-    fi
-    return 0
-}
-
-check_service_health() {
-    local max_retries=30
-    local retry=0
-    local port="${PORT:-3001}"
-    
-    while [ $retry -lt $max_retries ]; do
-        if curl -sf "http://localhost:$port/" > /dev/null 2>&1; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Service health check passed" >> "$HEALTH_CHECK_LOG"
-            return 0
-        fi
-        sleep 1
-        ((retry++))
-    done
-    
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Service health check failed after ${max_retries}s" >> "$HEALTH_CHECK_LOG"
-    return 1
-}
-
-acquire_lock
-rotate_logs
+acquire_lock "check-git"
+rotate_logs "$LOG_DIR"
 
 START_TIME=$(date +%s)
 
-if [ -f "$APP_DIR/.env" ]; then
-    set -a
-    source "$APP_DIR/.env"
-    set +a
-fi
+load_env_file
 
 if ! validate_env; then
-    notify "error" "环境变量缺失" "缺少必要的环境变量，请检查 .env 文件" "" "" ""
+    notify "$GIT_LOG" "error" "环境变量缺失" "缺少必要的环境变量，请检查 .env 文件" "" "" ""
     exit 1
 fi
 
@@ -257,11 +134,11 @@ health_check() {
 
     if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Restarting service..." >> "$GIT_LOG"
-        systemctl --user restart sd-ui 2>/dev/null || true
+        systemctl --user restart "$SERVICE_NAME" 2>/dev/null || true
     fi
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Health Check End (Repaired) ===" >> "$HEALTH_CHECK_LOG"
-    
+
     HEALTH_ISSUES="${issues[*]}"
     return 0
 }
@@ -269,98 +146,19 @@ health_check() {
 HEALTH_ISSUES=""
 health_check
 
-get_last_status() {
-    if [ -f "$LAST_STATUS_FILE" ]; then
-        cat "$LAST_STATUS_FILE"
-    else
-        echo "unknown"
-    fi
-}
-
-save_status() {
-    echo "$1" > "$LAST_STATUS_FILE"
-}
-
-should_send_failure_notification() {
-    local last_status=$(get_last_status)
-    [ "$last_status" != "failed" ]
-}
-
-notify() {
-    local status="$1"
-    local message="$2"
-    local commit_title="${3:-}"
-    local commit_body="${4:-}"
-    local changed_files="${5:-}"
-    local extra_details="${6:-}"
-
-    if [ "$status" = "error" ] && ! should_send_failure_notification; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Failure notification suppressed (already notified)" >> "$GIT_LOG"
-        save_status "failed"
-        return 0
-    fi
-
-    send_deployment_notification "$status" "$message" "$commit_title" "$commit_body" "$changed_files" "$extra_details"
-    save_status "$status"
-}
-
-send_email() {
-    local subject="$1"
-    local status="$2"
-    local message="$3"
-    local commit_title="$4"
-    local commit_body="$5"
-    local changed_files="$6"
-    local extra_details="$7"
-    local current_version="$8"
-
-    if python3 "$SCRIPT_DIR/send_email.py" "$subject" "$status" "$message" "$commit_title" "$commit_body" "$changed_files" "$extra_details" "$current_version" >> "$GIT_LOG" 2>&1; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Email sent: $subject" >> "$GIT_LOG"
-    else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Email failed: $subject" >> "$GIT_LOG"
-    fi
-}
-
-send_deployment_notification() {
-    local status="$1"
-    local message="$2"
-    local commit_title="$3"
-    local commit_body="$4"
-    local changed_files="$5"
-    local extra_details="$6"
-
-    local status_text="成功"
-    if [ "$status" = "error" ]; then
-        status_text="失败"
-    elif [ "$status" = "warning" ]; then
-        status_text="警告"
-    elif [ "$status" = "health_repaired" ]; then
-        status_text="自愈"
-    fi
-
-    local current_version=$(get_current_version)
-
-    send_email "SD-UI 部署${status_text}" "$status" "$message" "$commit_title" "$commit_body" "$changed_files" "$extra_details" "$current_version"
-}
-
-ensure_scripts_executable() {
-    chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
-    chmod +x "$REPO_DIR"/scripts/*.sh 2>/dev/null || true
-}
-
 if [ -n "$HEALTH_ISSUES" ]; then
-    notify "health_repaired" "系统自愈完成" "" "" "" "检测并修复的问题: $HEALTH_ISSUES"
+    notify "$GIT_LOG" "health_repaired" "系统自愈完成" "" "" "" "检测并修复的问题: $HEALTH_ISSUES"
 fi
 
 cd "$APP_DIR"
 
 git fetch origin
-REMOTE_HASH=$(git rev-parse origin/main 2>/dev/null || echo "")
+REMOTE_HASH=$(git rev-parse "origin/$GIT_BRANCH" 2>/dev/null || echo "")
 LOCAL_HASH=$(git rev-parse HEAD 2>/dev/null || echo "")
 
 if [ -z "$LOCAL_HASH" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error: Not a git repository" >> "$GIT_LOG"
-    notify "error" "Git 仓库错误" "" "" "" "无法获取本地 commit hash"
+    notify "$GIT_LOG" "error" "Git 仓库错误" "" "" "" "无法获取本地 commit hash"
     exit 1
 fi
 
@@ -370,16 +168,15 @@ fi
 
 if ! git rev-parse --verify --quiet HEAD@{u} 2>/dev/null; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected new branch, performing initial pull..." >> "$GIT_LOG"
-    git pull origin main --ff-only 2>&1 | tee -a "$GIT_LOG" || {
+    git pull "origin/$GIT_BRANCH" --ff-only 2>&1 | tee -a "$GIT_LOG" || {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Initial pull failed, stashing local changes..." >> "$GIT_LOG"
         git stash 2>&1 | tee -a "$GIT_LOG" || true
-        git pull origin main --ff-only 2>&1 | tee -a "$GIT_LOG" || true
+        git pull "origin/$GIT_BRANCH" --ff-only 2>&1 | tee -a "$GIT_LOG" || true
         git stash pop 2>&1 | tee -a "$GIT_LOG" || true
     }
     ensure_scripts_executable
-    echo "$REMOTE_HASH" > "$LATEST_HASH_FILE"
     save_version
-    notify "success" "首次部署完成" "" "" "" "新分支初始化完成"
+    notify "$GIT_LOG" "success" "首次部署完成" "" "" "" "新分支初始化完成"
     exit 0
 fi
 
@@ -398,7 +195,7 @@ if [ -n "$LOCAL_CHANGES" ]; then
         HAS_STASH_CONTENT=true
     fi
 
-    PULL_RESULT=$(git pull origin main --ff-only 2>&1 || echo "FAILED")
+    PULL_RESULT=$(git pull "origin/$GIT_BRANCH" --ff-only 2>&1 || echo "FAILED")
     echo "$PULL_RESULT" >> "$GIT_LOG"
 
     if echo "$PULL_RESULT" | grep -q "FAILED"; then
@@ -406,7 +203,7 @@ if [ -n "$LOCAL_CHANGES" ]; then
         if [ "$HAS_STASH_CONTENT" = true ]; then
             git stash pop 2>&1 | tee -a "$GIT_LOG" || true
         fi
-        notify "error" "拉取失败" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "Git pull 失败，请检查网络或冲突"
+        notify "$GIT_LOG" "error" "拉取失败" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "Git pull 失败，请检查网络或冲突"
         exit 1
     fi
 
@@ -422,15 +219,14 @@ if [ -n "$LOCAL_CHANGES" ]; then
         fi
     fi
 else
-    git pull origin main --ff-only 2>&1 | tee -a "$GIT_LOG" || {
+    git pull "origin/$GIT_BRANCH" --ff-only 2>&1 | tee -a "$GIT_LOG" || {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset..." >> "$GIT_LOG"
-        git reset --hard origin/main 2>&1 | tee -a "$GIT_LOG" || true
-        notify "warning" "强制同步" "" "" "" "Git pull 失败，已执行硬重置"
+        git reset --hard "origin/$GIT_BRANCH" 2>&1 | tee -a "$GIT_LOG" || true
+        notify "$GIT_LOG" "warning" "强制同步" "" "" "" "Git pull 失败，已执行硬重置"
     }
 fi
 
 ensure_scripts_executable
-echo "$REMOTE_HASH" > "$LATEST_HASH_FILE"
 
 CHANGED_FILES=$(git diff --name-only "$LOCAL_HASH" "$REMOTE_HASH" 2>/dev/null || echo "")
 echo "Changed files: $CHANGED_FILES" >> "$GIT_LOG"
@@ -502,7 +298,7 @@ if [ "$SCRIPTS_CHANGED" = true ] && [ "$BACKEND_CHANGED" = false ] && [ "$FRONTE
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Only scripts changed, no restart needed" >> "$GIT_LOG"
     DEPLOY_MESSAGE="脚本已更新"
     DEPLOY_DETAILS="部署脚本有更新，健康检查已执行"
-    notify "success" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
+    notify "$GIT_LOG" "success" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
 elif [ "$BACKEND_CHANGED" = true ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backend/API changes detected, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
@@ -521,13 +317,15 @@ elif [ "$BACKEND_CHANGED" = true ]; then
         DEPLOY_RESULT="error"
         DEPLOY_MESSAGE="部署脚本错误"
         DEPLOY_DETAILS="hot-deploy.sh 不存在或不可执行"
-        notify "error" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
+        notify "$GIT_LOG" "error" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
         exit 1
     fi
 elif [ "$FRONTEND_ONLY" = true ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend only changes, rebuilding without restart..." >> "$GIT_LOG"
 
-    npm install >> "$GIT_LOG" 2>&1
+    if check_dependencies_changed "$LOCAL_HASH" "$REMOTE_HASH"; then
+        npm install >> "$GIT_LOG" 2>&1
+    fi
     npx prisma generate >> "$GIT_LOG" 2>&1
     npm run build >> "$GIT_LOG" 2>&1
     BUILD_EXIT=$?
@@ -536,7 +334,7 @@ elif [ "$FRONTEND_ONLY" = true ]; then
         DEPLOY_RESULT="error"
         DEPLOY_MESSAGE="前端构建失败"
         DEPLOY_DETAILS="npm run build 退出码: $BUILD_EXIT"
-        notify "error" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
+        notify "$GIT_LOG" "error" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
         exit 1
     fi
 
@@ -555,11 +353,11 @@ elif [ "$FRONTEND_ONLY" = true ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public files synced" >> "$GIT_LOG"
     fi
 
-    systemctl --user restart sd-ui 2>/dev/null || true
+    systemctl --user restart "$SERVICE_NAME" 2>/dev/null || true
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend rebuilt successfully" >> "$GIT_LOG"
     DEPLOY_MESSAGE="前端更新完成"
     DEPLOY_DETAILS="前端变更已构建并重启服务"
-    notify "success" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
+    notify "$GIT_LOG" "success" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
 else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generic update, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
