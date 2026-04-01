@@ -5,14 +5,12 @@ import json
 import subprocess
 from datetime import datetime
 
-# 尝试导入官方 Resend SDK
 try:
     import resend
     use_sdk = True
 except ImportError:
     use_sdk = False
 
-# 尝试导入 urllib
 try:
     import urllib.request
     import urllib.error
@@ -46,7 +44,7 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
     files_html = ""
     if changed_files:
         files_list = ""
-        for f in changed_files.split():  # 假设changed_files是空格分隔的文件列表
+        for f in changed_files.split():
             file_icon = "📄"
             if f.endswith(".sh"):
                 file_icon = "🔧"
@@ -62,101 +60,116 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
                 file_icon = "📝"
             elif f.startswith("ui/public/"):
                 file_icon = "🖼️"
-            files_list += f"<div style='display:flex;align-items:center;padding:8px 12px;background:#1F2937;border-radius:6px;margin-bottom:6px;font-family:ui-monospace,monospace;font-size:13px;'><span style='margin-right:10px;'>{file_icon}</span><span style='color:#E5E7EB;word-break:break-all;'>{f}</span></div>"
-        files_html = f"<div style='margin-top:20px;'>
-            <div style='font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;'>变更文件</div>
-            {files_list}
-        </div>"
+            files_list += (
+                "<div style=\"display:flex;align-items:center;padding:8px 12px;"
+                "background:#1F2937;border-radius:6px;margin-bottom:6px;"
+                "font-family:ui-monospace,monospace;font-size:13px;\">"
+                "<span style=\"margin-right:10px;\">" + file_icon + "</span>"
+                "<span style=\"color:#E5E7EB;word-break:break-all;\">" + f + "</span>"
+                "</div>"
+            )
+        files_html = (
+            "<div style=\"margin-top:20px;\">"
+            "<div style=\"font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;\">变更文件</div>"
+            + files_list +
+            "</div>"
+        )
 
     commit_html = ""
     if commit_title:
-        commit_html = f"<div style='margin-top:20px;'>
-            <div style='font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;'>Commit</div>
-            <div style='background:#1F2937;border-radius:8px;padding:16px;border-left:3px solid {status_color};'>
-                <div style='font-size:15px;font-weight:600;color:#F3F4F6;margin-bottom:8px;'>{commit_title}</div>"
+        commit_html = (
+            "<div style=\"margin-top:20px;\">"
+            "<div style=\"font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;\">Commit</div>"
+            "<div style=\"background:#1F2937;border-radius:8px;padding:16px;border-left:3px solid " + status_color + ";\">"
+            "<div style=\"font-size:15px;font-weight:600;color:#F3F4F6;margin-bottom:8px;\">" + commit_title + "</div>"
+        )
         if commit_body:
-            commit_html += f"<div style='font-size:13px;color:#9CA3AF;line-height:1.6;white-space:pre-wrap;'>{commit_body}</div>"
+            commit_html += "<div style=\"font-size:13px;color:#9CA3AF;line-height:1.6;white-space:pre-wrap;\">" + commit_body + "</div>"
         commit_html += "</div></div>"
 
     details_html = ""
     if extra_details:
-        details_html = f"<div style='margin-top:20px;'>
-            <div style='font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;'>详细信息</div>
-            <div style='background:#1F2937;border-radius:8px;padding:16px;font-size:13px;color:#D1D5DB;line-height:1.6;white-space:pre-wrap;'>{extra_details}</div>
-        </div>"
+        details_html = (
+            "<div style=\"margin-top:20px;\">"
+            "<div style=\"font-size:13px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;\">详细信息</div>"
+            "<div style=\"background:#1F2937;border-radius:8px;padding:16px;font-size:13px;color:#D1D5DB;line-height:1.6;white-space:pre-wrap;\">" + extra_details + "</div>"
+            "</div>"
+        )
 
     version_html = ""
     if current_version != "unknown":
-        version_html = f"<div style='margin-top:12px;font-size:12px;color:#6B7280;'>当前版本: {current_version[:8] if len(current_version) > 8 else current_version}</div>"
+        version_html = "<div style=\"margin-top:12px;font-size:12px;color:#6B7280;\">当前版本: " + (current_version[:8] if len(current_version) > 8 else current_version) + "</div>"
 
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    html_body = f'''<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <style>
-        body {{ margin: 0; padding: 0; background-color: #111827; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }}
-    </style>
-</head>
-<body>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#111827;padding:30px 15px;">
-        <tr>
-            <td align="center">
-                <table width="560" cellpadding="0" cellspacing="0" style="background:#1F2937;border-radius:16px;overflow:hidden;border:1px solid #374151;max-width:560px;">
-                    <tr>
-                        <td style="padding:28px 32px;border-bottom:1px solid #374151;">
-                            <table width="100%" cellpadding="0" cellspacing="0">
-                                <tr>
-                                    <td>
-                                        <div style="display:flex;align-items:center;">
-                                            <div style="width:40px;height:40px;background:linear-gradient(135deg,{status_color} 0%,{status_color}99 100%);border-radius:10px;margin-right:14px;display:flex;align-items:center;justify-content:center;">
-                                                <span style="font-size:20px;">🚀</span>
-                                            </div>
-                                            <div>
-                                                <div style="font-size:18px;font-weight:700;color:#F9FAFB;">SD-UI</div>
-                                                <div style="font-size:12px;color:#6B7280;">热部署系统</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td align="right">
-                                        <span style="display:inline-block;padding:6px 14px;border-radius:20px;background:{status_bg};color:{status_color};font-size:13px;font-weight:600;">{status_text}</span>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding:28px 32px;">
-                            <div style="margin-bottom:20px;">
-                                <div style="font-size:13px;color:#6B7280;margin-bottom:6px;">消息</div>
-                                <div style="font-size:16px;color:#F3F4F6;font-weight:500;">{message}</div>
-                            </div>
-                            <div style="margin-bottom:20px;">
-                                <div style="font-size:13px;color:#6B7280;margin-bottom:6px;">时间</div>
-                                <div style="font-size:14px;color:#D1D5DB;">{current_time}</div>
-                            </div>
-                            {commit_html}
-                            {files_html}
-                            {details_html}
-                            {version_html}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding:20px 32px;background:#111827;border-top:1px solid #374151;">
-                            <div style="text-align:center;">
-                                <span style="font-size:12px;color:#4B5563;">此邮件由 SD-UI 热部署系统发送</span>
-                            </div>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>'''
+    html_body = (
+        '<!DOCTYPE html>\n'
+        '<html>\n'
+        '<head>\n'
+        '    <meta charset="utf-8">\n'
+        '    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+        '    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">\n'
+        '    <style>\n'
+        '        body { margin: 0; padding: 0; background-color: #111827; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }\n'
+        '    </style>\n'
+        '</head>\n'
+        '<body>\n'
+        '    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#111827;padding:30px 15px;">\n'
+        '        <tr>\n'
+        '            <td align="center">\n'
+        '                <table width="560" cellpadding="0" cellspacing="0" style="background:#1F2937;border-radius:16px;overflow:hidden;border:1px solid #374151;max-width:560px;">\n'
+        '                    <tr>\n'
+        '                        <td style="padding:28px 32px;border-bottom:1px solid #374151;">\n'
+        '                            <table width="100%" cellpadding="0" cellspacing="0">\n'
+        '                                <tr>\n'
+        '                                    <td>\n'
+        '                                        <div style="display:flex;align-items:center;">\n'
+        '                                            <div style="width:40px;height:40px;background:linear-gradient(135deg,' + status_color + ' 0%,' + status_color + '99 100%);border-radius:10px;margin-right:14px;display:flex;align-items:center;justify-content:center;">\n'
+        '                                                <span style="font-size:20px;">🚀</span>\n'
+        '                                            </div>\n'
+        '                                            <div>\n'
+        '                                                <div style="font-size:18px;font-weight:700;color:#F9FAFB;">SD-UI</div>\n'
+        '                                                <div style="font-size:12px;color:#6B7280;">热部署系统</div>\n'
+        '                                            </div>\n'
+        '                                        </div>\n'
+        '                                    </td>\n'
+        '                                    <td align="right">\n'
+        '                                        <span style="display:inline-block;padding:6px 14px;border-radius:20px;background:' + status_bg + ';color:' + status_color + ';font-size:13px;font-weight:600;">' + status_text + '</span>\n'
+        '                                    </td>\n'
+        '                                </tr>\n'
+        '                            </table>\n'
+        '                        </td>\n'
+        '                    </tr>\n'
+        '                    <tr>\n'
+        '                        <td style="padding:28px 32px;">\n'
+        '                            <div style="margin-bottom:20px;">\n'
+        '                                <div style="font-size:13px;color:#6B7280;margin-bottom:6px;">消息</div>\n'
+        '                                <div style="font-size:16px;color:#F3F4F6;font-weight:500;">' + message + '</div>\n'
+        '                            </div>\n'
+        '                            <div style="margin-bottom:20px;">\n'
+        '                                <div style="font-size:13px;color:#6B7280;margin-bottom:6px;">时间</div>\n'
+        '                                <div style="font-size:14px;color:#D1D5DB;">' + current_time + '</div>\n'
+        '                            </div>\n'
+        + commit_html + '\n'
+        + files_html + '\n'
+        + details_html + '\n'
+        + version_html + '\n'
+        '                        </td>\n'
+        '                    </tr>\n'
+        '                    <tr>\n'
+        '                        <td style="padding:20px 32px;background:#111827;border-top:1px solid #374151;">\n'
+        '                            <div style="text-align:center;">\n'
+        '                                <span style="font-size:12px;color:#4B5563;">此邮件由 SD-UI 热部署系统发送</span>\n'
+        '                            </div>\n'
+        '                        </td>\n'
+        '                    </tr>\n'
+        '                </table>\n'
+        '            </td>\n'
+        '        </tr>\n'
+        '    </table>\n'
+        '</body>\n'
+        '</html>'
+    )
     return html_body
 
 def send_email_with_sdk(api_key, email_from, email_to, subject, html_body):
@@ -268,7 +281,6 @@ def send_email_with_urllib(api_key, email_from, email_to, subject, html_body):
 
 def send_email(subject, status, message, commit_title="", commit_body="", changed_files="", extra_details="", current_version="unknown"):
     """发送邮件通知"""
-    # 尝试从环境变量文件加载
     env_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ui", ".env")
     if os.path.exists(env_file):
         with open(env_file, "r", encoding="utf-8") as f:
@@ -293,17 +305,14 @@ def send_email(subject, status, message, commit_title="", commit_body="", change
         print(f"EMAIL_TO: {'SET' if email_to else 'NOT SET'}")
         return False
 
-    # 生成HTML内容
     html_body = generate_email_html(status, message, commit_title, commit_body, changed_files, extra_details, current_version)
 
-    # 优先使用官方 SDK
     if use_sdk:
         print("Trying to send email with Resend SDK...")
         if send_email_with_sdk(api_key, email_from, email_to, subject, html_body):
             return True
         print("SDK failed, trying curl...")
-    
-    # 其次使用 curl
+
     try:
         print("Trying to send email with curl...")
         if send_email_with_curl(api_key, email_from, email_to, subject, html_body):
@@ -311,14 +320,12 @@ def send_email(subject, status, message, commit_title="", commit_body="", change
         print("curl failed, trying urllib...")
     except Exception as e:
         print(f"curl setup failed: {e}")
-    
-    # 最后使用 urllib
+
     if use_urllib:
         print("Trying to send email with urllib...")
         if send_email_with_urllib(api_key, email_from, email_to, subject, html_body):
             return True
-    
-    # 所有方法都失败
+
     print("All email sending methods failed")
     return False
 
