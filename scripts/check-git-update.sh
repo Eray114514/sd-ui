@@ -345,7 +345,9 @@ elif [ "$BACKEND_CHANGED" = true ]; then
         if [ $DEPLOY_EXIT -ne 0 ]; then
             DEPLOY_RESULT="error"
             DEPLOY_MESSAGE="热部署失败"
-            DEPLOY_DETAILS="hot-deploy.sh 退出码: $DEPLOY_EXIT"
+            DEPLOY_DETAILS="hot-deploy.sh 退出码: $DEPLOY_EXIT
+
+$(get_last_logs "$LOG_DIR/hot-deploy.log" 100)"
         else
             DEPLOY_MESSAGE="热部署完成"
             DEPLOY_DETAILS="后端/API 变更已部署"
@@ -371,7 +373,9 @@ elif [ "$FRONTEND_ONLY" = true ]; then
     if [ $BUILD_EXIT -ne 0 ]; then
         DEPLOY_RESULT="error"
         DEPLOY_MESSAGE="前端构建失败"
-        DEPLOY_DETAILS="npm run build 退出码: $BUILD_EXIT"
+        DEPLOY_DETAILS="npm run build 退出码: $BUILD_EXIT
+
+$(get_last_logs "$GIT_LOG" 100)"
         notify "$GIT_LOG" "error" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
         exit 1
     fi

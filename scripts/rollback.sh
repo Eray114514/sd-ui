@@ -27,21 +27,27 @@ cd "$APP_DIR"
 log "$LOG_FILE" "Installing dependencies..."
 if ! npm install >> "$LOG_FILE" 2>&1; then
     log "$LOG_FILE" "npm install failed"
-    notify "$LOG_FILE" "error" "回滚失败" "" "" "" "npm install 失败"
+    notify "$LOG_FILE" "error" "回滚失败" "" "" "" "npm install 失败
+
+$(get_last_logs "$LOG_FILE" 100)"
     exit 1
 fi
 
 log "$LOG_FILE" "Generating Prisma client..."
 if ! npx prisma generate >> "$LOG_FILE" 2>&1; then
     log "$LOG_FILE" "prisma generate failed"
-    notify "$LOG_FILE" "error" "回滚失败" "" "" "" "prisma generate 失败"
+    notify "$LOG_FILE" "error" "回滚失败" "" "" "" "prisma generate 失败
+
+$(get_last_logs "$LOG_FILE" 100)"
     exit 1
 fi
 
 log "$LOG_FILE" "Building..."
 if ! npm run build >> "$LOG_FILE" 2>&1; then
     log "$LOG_FILE" "Build failed"
-    notify "$LOG_FILE" "error" "回滚失败" "" "" "" "构建失败"
+    notify "$LOG_FILE" "error" "回滚失败" "" "" "" "构建失败
+
+$(get_last_logs "$LOG_FILE" 100)"
     exit 1
 fi
 

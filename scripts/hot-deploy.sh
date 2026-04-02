@@ -165,41 +165,7 @@ health_check() {
 
 health_check
 
-get_last_status() {
-    local file="$STATE_DIR/.last_deploy_status"
-    if [ -f "$file" ]; then
-        cat "$file"
-    else
-        echo "unknown"
-    fi
-}
 
-save_status() {
-    echo "$1" > "$STATE_DIR/.last_deploy_status"
-}
-
-should_send_failure_notification() {
-    local last_status=$(get_last_status)
-    [ "$last_status" != "failed" ]
-}
-
-notify() {
-    local status="$1"
-    local message="$2"
-    local commit_title="${3:-}"
-    local commit_body="${4:-}"
-    local changed_files="${5:-}"
-    local extra_details="${6:-}"
-
-    if [ "$status" = "error" ] && ! should_send_failure_notification; then
-        log "$LOG_FILE" "Failure notification suppressed (already notified)"
-        save_status "failed"
-        return 0
-    fi
-
-    send_deployment_notification "$LOG_FILE" "$status" "$message" "$commit_title" "$commit_body" "$changed_files" "$extra_details"
-    save_status "$status"
-}
 
 detect_and_install_nodejs() {
     if ! command -v node &> /dev/null; then
@@ -392,9 +358,11 @@ if [ -n "$PREVIOUS_COMMIT" ]; then
         if ! run_npm_install; then
             DEPLOY_RESULT="error"
             DEPLOY_MESSAGE="依赖安装失败"
-            DEPLOY_DETAILS="npm install 失败，请检查日志: $LOG_FILE"
+            DEPLOY_DETAILS="npm install 失败，请检查日志: $LOG_FILE
+
+$(get_last_logs "$LOG_FILE" 100)"
             log "$LOG_FILE" "ERROR: npm install failed after retry"
-            notify "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
+            notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
             exit 1
         fi
     else
@@ -404,9 +372,11 @@ else
     if ! run_npm_install; then
         DEPLOY_RESULT="error"
         DEPLOY_MESSAGE="依赖安装失败"
-        DEPLOY_DETAILS="npm install 失败，请检查日志: $LOG_FILE"
+        DEPLOY_DETAILS="npm install 失败，请检查日志: $LOG_FILE
+
+$(get_last_logs "$LOG_FILE" 100)"
         log "$LOG_FILE" "ERROR: npm install failed after retry"
-        notify "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
+        notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
         exit 1
     fi
 fi
@@ -414,9 +384,11 @@ fi
 if ! run_prisma_generate; then
     DEPLOY_RESULT="error"
     DEPLOY_MESSAGE="Prisma 生成失败"
-    DEPLOY_DETAILS="npx prisma generate 失败，请检查日志: $LOG_FILE"
+    DEPLOY_DETAILS="npx prisma generate 失败，请检查日志: $LOG_FILE
+
+$(get_last_logs "$LOG_FILE" 100)"
     log "$LOG_FILE" "ERROR: Prisma generate failed"
-    notify "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
+    notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
     exit 1
 fi
 
@@ -440,9 +412,11 @@ if [ $build_exit_code -ne 0 ]; then
     if [ $build_exit_code -ne 0 ]; then
         DEPLOY_RESULT="error"
         DEPLOY_MESSAGE="构建失败"
-        DEPLOY_DETAILS="npm run build 失败 (退出码: $build_exit_code)，请检查日志: $LOG_FILE"
+        DEPLOY_DETAILS="npm run build 失败 (退出码: $build_exit_code)，请检查日志: $LOG_FILE
+
+$(get_last_logs "$LOG_FILE" 100)"
         log "$LOG_FILE" "ERROR: Build failed after retry"
-        notify "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
+        notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
         exit 1
     fi
 fi
@@ -483,4 +457,4 @@ DURATION=$((END_TIME - START_TIME))
 record_stats "$DEPLOY_RESULT" "$DURATION" "$(git rev-parse HEAD 2>/dev/null || echo 'unknown')" "$HEALTH_ISSUES"
 
 log "$LOG_FILE" "=== Hot deployment complete (duration: ${DURATION}s) ==="
-notify "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
+notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"

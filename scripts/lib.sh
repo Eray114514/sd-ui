@@ -217,7 +217,7 @@ load_env_file() {
 get_last_status() {
     local file="$STATE_DIR/.last_deploy_status"
     if [ -f "$file" ]; then
-        cat "$file"
+        cat "$file" 2>/dev/null || echo "unknown"
     else
         echo "unknown"
     fi
@@ -227,9 +227,68 @@ save_status() {
     echo "$1" > "$STATE_DIR/.last_deploy_status"
 }
 
+get_last_logs() {
+    local log_file="$1"
+    local lines="${2:-50}"
+    if [ -f "$log_file" ]; then
+        echo -e "\n--- 最近 $lines 行日志 ---\n"
+        tail -n "$lines" "$log_file" 2>/dev/null || echo "无法读取日志"
+    else
+        echo -e "\n--- 日志文件未找到: $log_file ---\n"
+    fi
+}
+
 should_send_failure_notification() {
     local last_status=$(get_last_status)
     [ "$last_status" != "failed" ]
+}
+
+check_duplicate_notification() {
+    local log_file="$1"
+    local status="$2"
+    local message="$3"
+    local extra_details="${4:-}"
+
+    # Generate a hash for the notification content
+    local content_to_hash="${status}:${message}:${extra_details}"
+    local current_hash=$(echo "$content_to_hash" | md5sum | cut -d' ' -f1)
+    
+    local hash_file="$STATE_DIR/.notify_last_hash"
+    local count_file="$STATE_DIR/.notify_duplicate_count"
+    
+    local last_hash=""
+    local count=0
+    
+    if [ -f "$hash_file" ]; then
+        last_hash=$(cat "$hash_file" 2>/dev/null || echo "")
+    fi
+    
+    if [ -f "$count_file" ]; then
+        count=$(cat "$count_file" 2>/dev/null || echo "0")
+    fi
+    
+    if [ "$current_hash" = "$last_hash" ]; then
+        count=$((count + 1))
+        echo "$count" > "$count_file"
+        
+        if [ "$count" -eq 3 ]; then
+            log "$log_file" "Duplicate notification threshold reached. Sending pause alert."
+            local pause_msg="系统检测到连续 3 次发送相同内容的通知（状态: $status, 消息: $message），为防止邮件轰炸，已暂停此类通知。请尽快检查系统状态！
+
+原通知内容：
+$extra_details"
+            send_deployment_notification "$log_file" "error" "通知已暂停 (重复发送)" "" "" "" "$pause_msg"
+            return 1 # Suppress original
+        elif [ "$count" -gt 3 ]; then
+            log "$log_file" "Notification suppressed (duplicate message count: $count)"
+            return 1 # Suppress original
+        fi
+    else
+        echo "$current_hash" > "$hash_file"
+        echo "1" > "$count_file"
+    fi
+    
+    return 0 # Do not suppress
 }
 
 notify() {
@@ -241,15 +300,51 @@ notify() {
     local changed_files="${6:-}"
     local extra_details="${7:-}"
 
-    if [ "$status" = "error" ] && ! should_send_failure_notification; then
-        log "$log_file" "Failure notification suppressed (already notified)"
-        save_status "failed"
+    if ! check_duplicate_notification "$log_file" "$status" "$message" "$extra_details"; then
+        save_status "$status"
         return 0
     fi
 
     send_deployment_notification "$log_file" "$status" "$message" "$commit_title" "$commit_body" "$changed_files" "$extra_details"
     save_status "$status"
 }
+
+handle_unexpected_exit() {
+    local exit_code=$1
+    local line_no=$2
+    local script_name=$(basename "$0")
+    
+    # Remove traps to prevent loops
+    trap - ERR
+    
+    if [ "$exit_code" -ne 0 ]; then
+        local error_msg="脚本 ${script_name} 在第 ${line_no} 行发生意外错误并停止运行 (退出码: ${exit_code})"
+        local log_target="${LOG_DIR:-/tmp}/error.log"
+        if [ -n "${GIT_LOG:-}" ]; then
+            log_target="$GIT_LOG"
+        elif [ -n "${LOG_FILE:-}" ]; then
+            log_target="$LOG_FILE"
+        fi
+        
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $error_msg" >> "$log_target"
+        
+        local extra_details="$error_msg"
+        if [ -f "$log_target" ]; then
+            extra_details="${extra_details}
+$(get_last_logs "$log_target" 100)"
+        fi
+        
+        if type notify >/dev/null 2>&1; then
+            # Call notify, it will use duplicate detection
+            notify "$log_target" "error" "系统运行异常中断" "" "" "" "$extra_details"
+        fi
+    fi
+    
+    exit "$exit_code"
+}
+
+# Enable global error trap for all scripts that source lib.sh
+trap 'handle_unexpected_exit $? $LINENO' ERR
 
 send_email() {
     local log_file="$1"
