@@ -352,10 +352,16 @@ send_email() {
     local log_file="$1"
     shift
 
-    if python3 "$SCRIPT_DIR/send_email.py" "$@" >> "$log_file" 2>&1; then
+    # Add timeout to python script execution to prevent hanging
+    if timeout 60s python3 "$SCRIPT_DIR/send_email.py" "$@" >> "$log_file" 2>&1; then
         log "$log_file" "Email sent: $1"
     else
-        log "$log_file" "Email failed: $1"
+        local exit_code=$?
+        if [ $exit_code -eq 124 ]; then
+            log "$log_file" "Email failed (Timeout after 60s): $1"
+        else
+            log "$log_file" "Email failed (Exit code $exit_code): $1"
+        fi
     fi
 }
 
@@ -387,15 +393,23 @@ backup_database() {
     if [ -f "$db_path" ]; then
         local backup_name="dev.db.$(date '+%Y%m%d_%H%M%S').backup"
         local backup_path="$BACKUP_DIR/$backup_name"
-        cp "$db_path" "$backup_path"
-        log "$LOG_DIR/hot-deploy.log" "Database backed up to: $backup_path"
+        
+        # 确保目录存在
+        mkdir -p "$BACKUP_DIR"
+        
+        # 尝试复制，如果失败（如磁盘空间不足）只记录警告，不阻断部署
+        if cp "$db_path" "$backup_path" 2>/dev/null; then
+            log "$LOG_DIR/hot-deploy.log" "Database backed up to: $backup_path"
 
-        local old_backups=($(ls -t "$BACKUP_DIR"/dev.db.*.backup 2>/dev/null || true))
-        if [ ${#old_backups[@]} -gt "$MAX_DB_BACKUPS" ]; then
-            for ((i=MAX_DB_BACKUPS; i<${#old_backups[@]}; i++)); do
-                rm -f "${old_backups[$i]}"
-                log "$LOG_DIR/hot-deploy.log" "Removed old backup: ${old_backups[$i]}"
-            done
+            local old_backups=($(ls -t "$BACKUP_DIR"/dev.db.*.backup 2>/dev/null || true))
+            if [ ${#old_backups[@]} -gt "$MAX_DB_BACKUPS" ]; then
+                for ((i=MAX_DB_BACKUPS; i<${#old_backups[@]}; i++)); do
+                    rm -f "${old_backups[$i]}"
+                    log "$LOG_DIR/hot-deploy.log" "Removed old backup: ${old_backups[$i]}"
+                done
+            fi
+        else
+            log "$LOG_DIR/hot-deploy.log" "WARNING: Failed to backup database (maybe disk full?), continuing deployment..."
         fi
     fi
 }

@@ -245,7 +245,7 @@ if [ -n "$LOCAL_CHANGES" ]; then
         COMMIT_TITLE=$(git log -1 --format="%s" "origin/$GIT_BRANCH" 2>/dev/null || echo "Unknown Commit")
         COMMIT_BODY=$(git log -1 --format="%b" "origin/$GIT_BRANCH" 2>/dev/null || echo "")
         CHANGED_FILES="unknown"
-        notify "$GIT_LOG" "error" "拉取失败" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "Git pull 失败，请检查网络或冲突"
+        notify "$GIT_LOG" "error" "拉取失败" "${COMMIT_TITLE:-}" "${COMMIT_BODY:-}" "${CHANGED_FILES:-}" "Git pull 失败，请检查网络或冲突"
         exit 1
     fi
 
@@ -264,7 +264,8 @@ else
     git pull "origin/$GIT_BRANCH" --ff-only 2>&1 | tee -a "$GIT_LOG" || {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset..." >> "$GIT_LOG"
         git reset --hard "origin/$GIT_BRANCH" 2>&1 | tee -a "$GIT_LOG" || true
-        notify "$GIT_LOG" "warning" "强制同步" "" "" "" "Git pull 失败，已执行硬重置"
+        COMMIT_TITLE=$(git log -1 --format="%s" "origin/$GIT_BRANCH" 2>/dev/null || echo "Unknown Commit")
+        notify "$GIT_LOG" "warning" "强制同步" "${COMMIT_TITLE:-}" "" "" "Git pull 失败，已执行硬重置"
     }
 fi
 
