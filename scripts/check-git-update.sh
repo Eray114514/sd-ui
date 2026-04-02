@@ -228,8 +228,8 @@ if [ -n "$LOCAL_CHANGES" ]; then
     NEED_REBUILD=true
 
     if [ -n "$LOCAL_CHANGES" ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Stashing local changes..." >> "$GIT_LOG"
-        git stash 2>&1 | tee -a "$GIT_LOG" || true
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Stashing local changes (including untracked)..." >> "$GIT_LOG"
+        git stash -u 2>&1 | tee -a "$GIT_LOG" || true
         HAS_STASH_CONTENT=true
     fi
 
@@ -237,35 +237,44 @@ if [ -n "$LOCAL_CHANGES" ]; then
     echo "$PULL_RESULT" >> "$GIT_LOG"
 
     if echo "$PULL_RESULT" | grep -q "FAILED"; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, restoring local changes..." >> "$GIT_LOG"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset and clean to resolve conflict..." >> "$GIT_LOG"
+        git reset --hard "origin/$GIT_BRANCH" 2>&1 | tee -a "$GIT_LOG" || true
+        git clean -fd 2>&1 | tee -a "$GIT_LOG" || true
+        
         if [ "$HAS_STASH_CONTENT" = true ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restoring local changes after hard reset..." >> "$GIT_LOG"
             git stash pop 2>&1 | tee -a "$GIT_LOG" || true
+            
+            CONFLICTS=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
+            if [ -n "$CONFLICTS" ]; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected conflicts: $CONFLICTS" >> "$GIT_LOG"
+                git checkout --theirs . 2>/dev/null || true
+                git add -A 2>/dev/null || true
+            fi
         fi
-        # Fetch basic commit info for notification even if pull fails
+        
         COMMIT_TITLE=$(git log -1 --format="%s" "origin/$GIT_BRANCH" 2>/dev/null || echo "Unknown Commit")
-        COMMIT_BODY=$(git log -1 --format="%b" "origin/$GIT_BRANCH" 2>/dev/null || echo "")
-        CHANGED_FILES="unknown"
-        notify "$GIT_LOG" "error" "拉取失败" "${COMMIT_TITLE:-}" "${COMMIT_BODY:-}" "${CHANGED_FILES:-}" "Git pull 失败，请检查网络或冲突"
-        exit 1
-    fi
+        notify "$GIT_LOG" "warning" "强制同步" "${COMMIT_TITLE:-}" "" "" "Git pull 失败，已执行硬重置并尝试恢复本地修改"
+    else
+        if [ "$HAS_STASH_CONTENT" = true ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restoring local changes..." >> "$GIT_LOG"
+            git stash pop 2>&1 | tee -a "$GIT_LOG" || true
 
-    if [ "$HAS_STASH_CONTENT" = true ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restoring local changes..." >> "$GIT_LOG"
-        git stash pop 2>&1 | tee -a "$GIT_LOG" || true
-
-        CONFLICTS=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
-        if [ -n "$CONFLICTS" ]; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected conflicts: $CONFLICTS" >> "$GIT_LOG"
-            git checkout --theirs . 2>/dev/null || true
-            git add -A 2>/dev/null || true
+            CONFLICTS=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
+            if [ -n "$CONFLICTS" ]; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected conflicts: $CONFLICTS" >> "$GIT_LOG"
+                git checkout --theirs . 2>/dev/null || true
+                git add -A 2>/dev/null || true
+            fi
         fi
     fi
 else
     git pull "origin/$GIT_BRANCH" --ff-only 2>&1 | tee -a "$GIT_LOG" || {
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset..." >> "$GIT_LOG"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset and clean..." >> "$GIT_LOG"
         git reset --hard "origin/$GIT_BRANCH" 2>&1 | tee -a "$GIT_LOG" || true
+        git clean -fd 2>&1 | tee -a "$GIT_LOG" || true
         COMMIT_TITLE=$(git log -1 --format="%s" "origin/$GIT_BRANCH" 2>/dev/null || echo "Unknown Commit")
-        notify "$GIT_LOG" "warning" "强制同步" "${COMMIT_TITLE:-}" "" "" "Git pull 失败，已执行硬重置"
+        notify "$GIT_LOG" "warning" "强制同步" "${COMMIT_TITLE:-}" "" "" "Git pull 失败，已执行硬重置和清理"
     }
 fi
 
