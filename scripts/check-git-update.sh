@@ -241,6 +241,9 @@ if [ -n "$LOCAL_CHANGES" ]; then
         git reset --hard "origin/$GIT_BRANCH" 2>&1 | tee -a "$GIT_LOG" || true
         git clean -fd 2>&1 | tee -a "$GIT_LOG" || true
         
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Ensuring scripts remain executable after hard reset..." >> "$GIT_LOG"
+        chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
+        
         if [ "$HAS_STASH_CONTENT" = true ]; then
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restoring local changes after hard reset..." >> "$GIT_LOG"
             git stash pop 2>&1 | tee -a "$GIT_LOG" || true
@@ -273,6 +276,10 @@ else
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset and clean..." >> "$GIT_LOG"
         git reset --hard "origin/$GIT_BRANCH" 2>&1 | tee -a "$GIT_LOG" || true
         git clean -fd 2>&1 | tee -a "$GIT_LOG" || true
+        
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Ensuring scripts remain executable after hard reset..." >> "$GIT_LOG"
+        chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
+        
         COMMIT_TITLE=$(git log -1 --format="%s" "origin/$GIT_BRANCH" 2>/dev/null || echo "Unknown Commit")
         notify "$GIT_LOG" "warning" "强制同步" "${COMMIT_TITLE:-}" "" "" "Git pull 失败，已执行硬重置和清理"
     }

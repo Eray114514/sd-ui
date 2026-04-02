@@ -346,6 +346,9 @@ git pull "origin/$GIT_BRANCH" --ff-only >> "$LOG_FILE" 2>&1 || {
     log "$LOG_FILE" "Pull failed, attempting hard reset and clean..."
     git reset --hard "origin/$GIT_BRANCH" >> "$LOG_FILE" 2>&1 || true
     git clean -fd >> "$LOG_FILE" 2>&1 || true
+    
+    log "$LOG_FILE" "Ensuring scripts remain executable after hard reset..."
+    chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
 }
 
 log "$LOG_FILE" "Backing up database..."
