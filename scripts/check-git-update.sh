@@ -170,7 +170,21 @@ fi
 
 cd "$APP_DIR"
 
-git fetch origin
+if [ -z "${SSH_AUTH_SOCK:-}" ]; then
+    if [ -S "$XDG_RUNTIME_DIR/ssh-agent.socket" ]; then
+        export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"
+    else
+        for sock in $(find /tmp -type s -name "agent.*" -user "$USER" 2>/dev/null); do
+            export SSH_AUTH_SOCK="$sock"
+            break
+        done
+    fi
+fi
+
+git fetch origin >> "$GIT_LOG" 2>&1 || {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error: git fetch failed (SSH auth issue in cron?)" >> "$GIT_LOG"
+}
+
 REMOTE_HASH=$(git rev-parse "origin/$GIT_BRANCH" 2>/dev/null || echo "")
 LOCAL_HASH=$(git rev-parse HEAD 2>/dev/null || echo "")
 
