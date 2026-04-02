@@ -241,6 +241,10 @@ if [ -n "$LOCAL_CHANGES" ]; then
         if [ "$HAS_STASH_CONTENT" = true ]; then
             git stash pop 2>&1 | tee -a "$GIT_LOG" || true
         fi
+        # Fetch basic commit info for notification even if pull fails
+        COMMIT_TITLE=$(git log -1 --format="%s" "origin/$GIT_BRANCH" 2>/dev/null || echo "Unknown Commit")
+        COMMIT_BODY=$(git log -1 --format="%b" "origin/$GIT_BRANCH" 2>/dev/null || echo "")
+        CHANGED_FILES="unknown"
         notify "$GIT_LOG" "error" "拉取失败" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "Git pull 失败，请检查网络或冲突"
         exit 1
     fi

@@ -248,9 +248,11 @@ check_duplicate_notification() {
     local status="$2"
     local message="$3"
     local extra_details="${4:-}"
+    
+    local current_commit=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
 
-    # Generate a hash for the notification content
-    local content_to_hash="${status}:${message}:${extra_details}"
+    # Generate a hash for the notification content including commit to distinguish successful deployments
+    local content_to_hash="${status}:${message}:${current_commit}:${extra_details}"
     local current_hash=$(echo "$content_to_hash" | md5sum | cut -d' ' -f1)
     
     local hash_file="$STATE_DIR/.notify_last_hash"
