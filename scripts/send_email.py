@@ -229,11 +229,12 @@ def send_email_with_curl(api_key, email_from, email_to, subject, html_body):
     try:
         cmd = [
             "curl",
-            "-s",
+            "-s", "-f",
             "-X", "POST",
             "https://api.resend.com/emails",
             "-H", f"Authorization: Bearer {api_key}",
             "-H", "Content-Type: application/json; charset=utf-8",
+            "-H", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "-d", json.dumps(data)
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
