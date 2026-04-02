@@ -169,7 +169,7 @@ validate_env() {
     fi
 
     if [ ${#missing[@]} -gt 0 ]; then
-        log "Missing required env vars: ${missing[*]}"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Missing required env vars: ${missing[*]}" >&2
         return 1
     fi
     return 0

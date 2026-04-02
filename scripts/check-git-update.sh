@@ -348,16 +348,18 @@ elif [ "$BACKEND_CHANGED" = true ]; then
             DEPLOY_DETAILS="hot-deploy.sh 退出码: $DEPLOY_EXIT
 
 $(get_last_logs "$LOG_DIR/hot-deploy.log" 100)"
+            notify "$GIT_LOG" "error" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
         else
             DEPLOY_MESSAGE="热部署完成"
             DEPLOY_DETAILS="后端/API 变更已部署"
+            notify "$GIT_LOG" "success" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
         fi
     else
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] hot-deploy.sh not found or not executable" >> "$GIT_LOG"
         DEPLOY_RESULT="error"
         DEPLOY_MESSAGE="部署脚本错误"
         DEPLOY_DETAILS="hot-deploy.sh 不存在或不可执行"
-        notify "$GIT_LOG" "error" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
+        notify "$GIT_LOG" "error" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
         exit 1
     fi
 elif [ "$FRONTEND_ONLY" = true ]; then
@@ -405,6 +407,26 @@ else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generic update, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
         "$SCRIPT_DIR/hot-deploy.sh"
+        DEPLOY_EXIT=$?
+        if [ $DEPLOY_EXIT -ne 0 ]; then
+            DEPLOY_RESULT="error"
+            DEPLOY_MESSAGE="热部署失败"
+            DEPLOY_DETAILS="hot-deploy.sh 退出码: $DEPLOY_EXIT
+
+$(get_last_logs "$LOG_DIR/hot-deploy.log" 100)"
+            notify "$GIT_LOG" "error" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
+        else
+            DEPLOY_MESSAGE="热部署完成"
+            DEPLOY_DETAILS="通用变更已部署"
+            notify "$GIT_LOG" "success" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
+        fi
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] hot-deploy.sh not found or not executable" >> "$GIT_LOG"
+        DEPLOY_RESULT="error"
+        DEPLOY_MESSAGE="部署脚本错误"
+        DEPLOY_DETAILS="hot-deploy.sh 不存在或不可执行"
+        notify "$GIT_LOG" "error" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
+        exit 1
     fi
 fi
 
