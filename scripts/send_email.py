@@ -34,48 +34,34 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
         status_color = "#ef4444"
         status_bg = "#450a0a"
         status_text = "部署失败"
-        icon = "❌"
     elif status == "warning":
         status_color = "#f59e0b"
         status_bg = "#451a03"
         status_text = "部署警告"
-        icon = "⚠️"
     elif status == "health_repaired":
         status_color = "#3b82f6"
         status_bg = "#172554"
         status_text = "系统自愈"
-        icon = "🔧"
     else:
         status_color = "#10b981"
         status_bg = "#064e3b"
         status_text = "部署成功"
-        icon = "✅"
 
     files_html = ""
     if changed_files:
         files_list = ""
         for f in changed_files.split():
-            file_icon = "📄"
-            if f.endswith(".sh"): file_icon = "🔧"
-            elif f.endswith(".tsx") or f.endswith(".ts"): file_icon = "⚛️"
-            elif f.endswith(".json"): file_icon = "📋"
-            elif f.endswith(".css") or f.endswith(".scss"): file_icon = "🎨"
-            elif f.endswith(".prisma"): file_icon = "🗃️"
-            elif f.endswith(".md"): file_icon = "📝"
-            elif f.startswith("ui/public/"): file_icon = "🖼️"
-            
             files_list += (
-                f'<div style="padding:12px 16px;'
-                f'background-color:#27272a;border-radius:8px;margin-bottom:8px;'
+                f'<div style="padding:10px 14px;'
+                f'background-image:linear-gradient(#27272a,#27272a);background-color:#27272a;border-radius:6px;margin-bottom:6px;'
                 f'font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;'
                 f'border:1px solid #3f3f46;">'
-                f'<span style="margin-right:12px;font-size:16px;vertical-align:middle;">{file_icon}</span>'
-                f'<span style="color:#e4e4e7;word-break:break-all;vertical-align:middle;">{f}</span>'
+                f'<span style="color:#e4e4e7;-webkit-text-fill-color:#e4e4e7;word-break:break-all;">{f}</span>'
                 f'</div>'
             )
         files_html = (
             f'<div style="margin-top:32px;">'
-            f'<div style="font-size:12px;font-weight:600;color:{text_muted};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">变更文件</div>'
+            f'<div style="font-size:12px;font-weight:600;color:{text_muted};-webkit-text-fill-color:{text_muted};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">变更文件</div>'
             f'{files_list}'
             f'</div>'
         )
@@ -84,20 +70,20 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
     if commit_title:
         commit_html = (
             f'<div style="margin-top:32px;">'
-            f'<div style="font-size:12px;font-weight:600;color:{text_muted};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">Git Commit</div>'
-            f'<div style="background-color:#27272a;border-radius:12px;padding:20px;border-left:4px solid {status_color};">'
-            f'<div style="font-size:16px;font-weight:600;color:{text_primary};margin-bottom:8px;">{commit_title}</div>'
+            f'<div style="font-size:12px;font-weight:600;color:{text_muted};-webkit-text-fill-color:{text_muted};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">Git Commit</div>'
+            f'<div style="background-image:linear-gradient(#27272a,#27272a);background-color:#27272a;border-radius:12px;padding:20px;border-left:4px solid {status_color};">'
+            f'<div style="font-size:16px;font-weight:600;color:{text_primary};-webkit-text-fill-color:{text_primary};margin-bottom:8px;">{commit_title}</div>'
         )
         if commit_body:
-            commit_html += f'<div style="font-size:14px;color:{text_secondary};line-height:1.6;white-space:pre-wrap;">{commit_body}</div>'
+            commit_html += f'<div style="font-size:14px;color:{text_secondary};-webkit-text-fill-color:{text_secondary};line-height:1.6;white-space:pre-wrap;">{commit_body}</div>'
         commit_html += f'</div></div>'
 
     details_html = ""
     if extra_details:
         details_html = (
             f'<div style="margin-top:32px;">'
-            f'<div style="font-size:12px;font-weight:600;color:{text_muted};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">详细日志</div>'
-            f'<div style="background-color:#000000;border-radius:12px;padding:20px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:13px;color:#d4d4d8;line-height:1.6;white-space:pre-wrap;overflow-x:auto;border:1px solid #27272a;">{extra_details}</div>'
+            f'<div style="font-size:12px;font-weight:600;color:{text_muted};-webkit-text-fill-color:{text_muted};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">详细日志</div>'
+            f'<div style="background-image:linear-gradient(#000000,#000000);background-color:#000000;border-radius:12px;padding:20px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:13px;color:#d4d4d8;-webkit-text-fill-color:#d4d4d8;line-height:1.6;white-space:pre-wrap;overflow-x:auto;border:1px solid #27272a;">{extra_details}</div>'
             f'</div>'
         )
 
@@ -108,8 +94,8 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
             f'<div style="margin-top:32px;padding-top:24px;border-top:1px dashed #27272a;">'
             f'<table width="100%" cellpadding="0" cellspacing="0" border="0">'
             f'<tr>'
-            f'<td align="left"><span style="font-size:13px;color:{text_muted};">系统版本</span></td>'
-            f'<td align="right"><span style="font-size:13px;color:{text_secondary};font-family:monospace;background-color:#27272a;padding:6px 12px;border-radius:6px;border:1px solid #3f3f46;">{short_ver}</span></td>'
+            f'<td align="left"><span style="font-size:13px;color:{text_muted};-webkit-text-fill-color:{text_muted};">系统版本</span></td>'
+            f'<td align="right"><span style="font-size:13px;color:{text_secondary};-webkit-text-fill-color:{text_secondary};font-family:monospace;background-image:linear-gradient(#27272a,#27272a);background-color:#27272a;padding:6px 12px;border-radius:6px;border:1px solid #3f3f46;">{short_ver}</span></td>'
             f'</tr>'
             f'</table>'
             f'</div>'
@@ -122,39 +108,39 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="only dark">
-    <meta name="supported-color-schemes" content="only dark">
+    <meta name="color-scheme" content="dark">
+    <meta name="supported-color-schemes" content="dark">
     <style>
         :root {{ color-scheme: dark; }}
         body, table, td, div {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }}
         body {{ margin: 0; padding: 0; background-color: {bg_dark}; color: {text_primary}; -webkit-font-smoothing: antialiased; }}
     </style>
 </head>
-<body bgcolor="{bg_dark}" style="margin: 0; padding: 0; background-color: {bg_dark}; min-height: 100vh;">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{bg_dark}" style="background-color: {bg_dark}; width: 100%; min-height: 100vh; table-layout: fixed;">
+<body bgcolor="{bg_dark}" style="margin: 0; padding: 0; background-image: linear-gradient({bg_dark}, {bg_dark}); background-color: {bg_dark}; min-height: 100vh;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{bg_dark}" style="background-image: linear-gradient({bg_dark}, {bg_dark}); background-color: {bg_dark}; width: 100%; min-height: 100vh; table-layout: fixed;">
         <tr>
             <td align="center" valign="top" style="padding: 40px 15px 60px 15px;">
                 <!-- Main Card -->
-                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%; background-color: {card_bg}; border-radius: 16px; overflow: hidden; border: 1px solid {card_border}; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%; background-image: linear-gradient({card_bg}, {card_bg}); background-color: {card_bg}; border-radius: 16px; overflow: hidden; border: 1px solid {card_border}; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
                     <!-- Top color bar -->
                     <tr>
-                        <td height="6" bgcolor="{status_color}" style="background-color: {status_color}; line-height: 6px; font-size: 6px;">&nbsp;</td>
+                        <td height="6" bgcolor="{status_color}" style="background-image: linear-gradient({status_color}, {status_color}); background-color: {status_color}; line-height: 6px; font-size: 6px;">&nbsp;</td>
                     </tr>
                     
                     <!-- Header -->
                     <tr>
-                        <td style="padding: 32px 40px; border-bottom: 1px solid {card_border}; background-color: {card_bg};" bgcolor="{card_bg}">
+                        <td style="padding: 32px 40px; border-bottom: 1px solid {card_border}; background-image: linear-gradient({card_bg}, {card_bg}); background-color: {card_bg};" bgcolor="{card_bg}">
                             <table width="100%" cellpadding="0" cellspacing="0" border="0">
                                 <tr>
                                     <td valign="middle">
-                                        <div style="font-size: 24px; font-weight: 700; color: #ffffff; margin: 0;">SD-UI 系统通知</div>
-                                        <div style="font-size: 13px; color: {text_secondary}; margin-top: 6px; letter-spacing: 0.05em;">AUTOMATED DEPLOYMENT</div>
+                                        <div style="font-size: 24px; font-weight: 700; color: #ffffff; -webkit-text-fill-color: #ffffff; margin: 0;">SD-UI 系统通知</div>
+                                        <div style="font-size: 13px; color: {text_secondary}; -webkit-text-fill-color: {text_secondary}; margin-top: 6px; letter-spacing: 0.05em;">AUTOMATED DEPLOYMENT</div>
                                     </td>
                                     <td align="right" valign="middle">
                                         <table cellpadding="0" cellspacing="0" border="0">
                                             <tr>
-                                                <td bgcolor="{status_bg}" style="padding: 8px 16px; background-color: {status_bg}; border-radius: 9999px; border: 1px solid {status_color}40;">
-                                                    <span style="font-size: 14px; font-weight: 600; color: {status_color};">{icon} {status_text}</span>
+                                                <td bgcolor="{status_bg}" style="padding: 8px 16px; background-image: linear-gradient({status_bg}, {status_bg}); background-color: {status_bg}; border-radius: 9999px; border: 1px solid {status_color}40; white-space: nowrap;">
+                                                    <span style="font-size: 14px; font-weight: 600; color: {status_color}; -webkit-text-fill-color: {status_color};">{status_text}</span>
                                                 </td>
                                             </tr>
                                         </table>
@@ -166,12 +152,12 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
 
                     <!-- Content Body -->
                     <tr>
-                        <td style="padding: 40px; background-color: {card_bg};" bgcolor="{card_bg}">
+                        <td style="padding: 40px; background-image: linear-gradient({card_bg}, {card_bg}); background-color: {card_bg};" bgcolor="{card_bg}">
                             <div style="margin-bottom: 8px;">
-                                <div style="font-size: 12px; font-weight: 600; color: {text_muted}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">运行状态</div>
-                                <div style="font-size: 20px; font-weight: 500; color: {text_primary}; line-height: 1.5;">{message}</div>
-                                <div style="font-size: 14px; color: {text_secondary}; margin-top: 12px;">
-                                    <span style="margin-right: 6px;">🕒</span> {current_time}
+                                <div style="font-size: 12px; font-weight: 600; color: {text_muted}; -webkit-text-fill-color: {text_muted}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">运行状态</div>
+                                <div style="font-size: 20px; font-weight: 500; color: {text_primary}; -webkit-text-fill-color: {text_primary}; line-height: 1.5;">{message}</div>
+                                <div style="font-size: 14px; color: {text_secondary}; -webkit-text-fill-color: {text_secondary}; margin-top: 12px;">
+                                    {current_time}
                                 </div>
                             </div>
 
@@ -185,10 +171,10 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
 
                     <!-- Footer -->
                     <tr>
-                        <td style="padding: 24px 40px; background-color: {bg_dark}; border-top: 1px solid {card_border}; text-align: center;" bgcolor="{bg_dark}">
-                            <div style="font-size: 13px; color: {text_muted}; line-height: 1.6;">
+                        <td style="padding: 24px 40px; background-image: linear-gradient({bg_dark}, {bg_dark}); background-color: {bg_dark}; border-top: 1px solid {card_border}; text-align: center;" bgcolor="{bg_dark}">
+                            <div style="font-size: 13px; color: {text_muted}; -webkit-text-fill-color: {text_muted}; line-height: 1.6;">
                                 此邮件由 SD-UI 热部署系统自动生成并发送<br>
-                                <span style="font-size: 12px; color: #3f3f46; margin-top: 12px; display: inline-block;">© 2026 SD-UI Project &bull; Environment: Linux</span>
+                                <span style="font-size: 12px; color: #3f3f46; -webkit-text-fill-color: #3f3f46; margin-top: 12px; display: inline-block;">© 2026 SD-UI Project &bull; Environment: Linux</span>
                             </div>
                         </td>
                     </tr>
