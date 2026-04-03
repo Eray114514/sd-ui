@@ -63,9 +63,14 @@ export function Sidebar() {
                 </div>
 
                 {/* API */}
-                <div className="text-[11px] font-bold text-muted-foreground cursor-pointer hover:text-primary transition-colors">
-                    API
-                </div>
+                <Link href="/api-docs">
+                    <div className={cn(
+                        "text-[11px] font-bold cursor-pointer transition-colors p-1 rounded-md",
+                        pathname === "/api-docs" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary"
+                    )}>
+                        API
+                    </div>
+                </Link>
 
                 {/* Bell */}
                 <div className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors p-1">

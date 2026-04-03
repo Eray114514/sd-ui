@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils"
 import {
     MessageSquare,
     Package,
-    Settings2
+    Settings2,
+    Code2
 } from "lucide-react"
 
 export function MobileNav() {
@@ -24,6 +25,12 @@ export function MobileNav() {
             icon: Package,
             href: "/assets",
             isActive: pathname === "/assets"
+        },
+        {
+            label: "API",
+            icon: Code2,
+            href: "/api-docs",
+            isActive: pathname === "/api-docs"
         },
         {
             label: "设置",
