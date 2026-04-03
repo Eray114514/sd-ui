@@ -233,11 +233,11 @@ if [ -n "$LOCAL_CHANGES" ]; then
         HAS_STASH_CONTENT=true
     fi
 
-    PULL_RESULT=$(git pull "origin/$GIT_BRANCH" --ff-only 2>&1 || echo "FAILED")
+    PULL_RESULT=$(git merge "origin/$GIT_BRANCH" --ff-only 2>&1 || echo "FAILED")
     echo "$PULL_RESULT" >> "$GIT_LOG"
 
     if echo "$PULL_RESULT" | grep -q "FAILED"; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset and clean to resolve conflict..." >> "$GIT_LOG"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Merge failed, attempting hard reset and clean to resolve conflict..." >> "$GIT_LOG"
         git reset --hard "origin/$GIT_BRANCH" 2>&1 | tee -a "$GIT_LOG" || true
         git clean -fd 2>&1 | tee -a "$GIT_LOG" || true
         
@@ -257,7 +257,7 @@ if [ -n "$LOCAL_CHANGES" ]; then
         fi
         
         COMMIT_TITLE=$(git log -1 --format="%s" "origin/$GIT_BRANCH" 2>/dev/null || echo "Unknown Commit")
-        notify "$GIT_LOG" "warning" "强制同步" "${COMMIT_TITLE:-}" "" "" "Git pull 失败，已执行硬重置并尝试恢复本地修改"
+        notify "$GIT_LOG" "warning" "强制同步" "${COMMIT_TITLE:-}" "" "" "Git pull / merge 失败，已执行硬重置并尝试恢复本地修改"
     else
         if [ "$HAS_STASH_CONTENT" = true ]; then
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restoring local changes..." >> "$GIT_LOG"
@@ -272,8 +272,8 @@ if [ -n "$LOCAL_CHANGES" ]; then
         fi
     fi
 else
-    git pull "origin/$GIT_BRANCH" --ff-only 2>&1 | tee -a "$GIT_LOG" || {
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pull failed, attempting hard reset and clean..." >> "$GIT_LOG"
+    git merge "origin/$GIT_BRANCH" --ff-only 2>&1 | tee -a "$GIT_LOG" || {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Merge failed, attempting hard reset and clean..." >> "$GIT_LOG"
         git reset --hard "origin/$GIT_BRANCH" 2>&1 | tee -a "$GIT_LOG" || true
         git clean -fd 2>&1 | tee -a "$GIT_LOG" || true
         
@@ -281,7 +281,7 @@ else
         chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
         
         COMMIT_TITLE=$(git log -1 --format="%s" "origin/$GIT_BRANCH" 2>/dev/null || echo "Unknown Commit")
-        notify "$GIT_LOG" "warning" "强制同步" "${COMMIT_TITLE:-}" "" "" "Git pull 失败，已执行硬重置和清理"
+        notify "$GIT_LOG" "warning" "强制同步" "${COMMIT_TITLE:-}" "" "" "Git pull / merge 失败，已执行硬重置和清理"
     }
 fi
 
