@@ -56,7 +56,7 @@ cp .env.example .env
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
 | `DATABASE_URL` | SQLite 数据库文件路径 | `file:./prisma/dev.db` |
-| `SD_API_URL` | Stable Diffusion API 地址 | `http://localhost:7860` |
+| `SD_WEBUI_BASE_URL` | Stable Diffusion API 地址 | `http://localhost:7860` |
 | `LOG_LEVEL` | 日志级别 (trace/debug/info/warn/error/fatal) | `info` |
 
 ### 4. 初始化数据库
