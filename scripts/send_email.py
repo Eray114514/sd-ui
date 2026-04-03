@@ -122,8 +122,8 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="light dark">
-    <meta name="supported-color-schemes" content="light dark">
+    <meta name="color-scheme" content="only dark">
+    <meta name="supported-color-schemes" content="only dark">
     <style>
         :root {{ color-scheme: dark; }}
         body, table, td, div {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }}
@@ -138,7 +138,7 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
                 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%; background-color: {card_bg}; border-radius: 16px; overflow: hidden; border: 1px solid {card_border}; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
                     <!-- Top color bar -->
                     <tr>
-                        <td height="6" bgcolor="{{status_color}}" style="background-color: {{status_color}}; line-height: 6px; font-size: 6px;">&nbsp;</td>
+                        <td height="6" bgcolor="{status_color}" style="background-color: {status_color}; line-height: 6px; font-size: 6px;">&nbsp;</td>
                     </tr>
                     
                     <!-- Header -->
@@ -153,8 +153,8 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
                                     <td align="right" valign="middle">
                                         <table cellpadding="0" cellspacing="0" border="0">
                                             <tr>
-                                                <td bgcolor="{{status_bg}}" style="padding: 8px 16px; background-color: {{status_bg}}; border-radius: 9999px; border: 1px solid {{status_color}}40;">
-                                                    <span style="font-size: 14px; font-weight: 600; color: {{status_color}};">{{icon}} {{status_text}}</span>
+                                                <td bgcolor="{status_bg}" style="padding: 8px 16px; background-color: {status_bg}; border-radius: 9999px; border: 1px solid {status_color}40;">
+                                                    <span style="font-size: 14px; font-weight: 600; color: {status_color};">{icon} {status_text}</span>
                                                 </td>
                                             </tr>
                                         </table>
@@ -169,16 +169,16 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
                         <td style="padding: 40px; background-color: {card_bg};" bgcolor="{card_bg}">
                             <div style="margin-bottom: 8px;">
                                 <div style="font-size: 12px; font-weight: 600; color: {text_muted}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">运行状态</div>
-                                <div style="font-size: 20px; font-weight: 500; color: {text_primary}; line-height: 1.5;">{{message}}</div>
+                                <div style="font-size: 20px; font-weight: 500; color: {text_primary}; line-height: 1.5;">{message}</div>
                                 <div style="font-size: 14px; color: {text_secondary}; margin-top: 12px;">
-                                    <span style="margin-right: 6px;">🕒</span> {{current_time}}
+                                    <span style="margin-right: 6px;">🕒</span> {current_time}
                                 </div>
                             </div>
 
-                            {{commit_html}}
-                            {{files_html}}
-                            {{details_html}}
-                            {{version_html}}
+                            {commit_html}
+                            {files_html}
+                            {details_html}
+                            {version_html}
                             
                         </td>
                     </tr>
