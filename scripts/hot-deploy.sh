@@ -271,7 +271,8 @@ run_prisma_migrate() {
         local exit_code=$?
     fi
 
-    cd "$REPO_DIR"
+    # Return to APP_DIR explicitly to be safe, not REPO_DIR
+    cd "$APP_DIR"
     return $exit_code
 }
 
@@ -342,8 +343,9 @@ log "$LOG_FILE" "=== Starting hot deployment ==="
 cd "$APP_DIR"
 
 log "$LOG_FILE" "Pulling latest version..."
-git pull "origin/$GIT_BRANCH" --ff-only >> "$LOG_FILE" 2>&1 || {
-    log "$LOG_FILE" "Pull failed, attempting hard reset and clean..."
+git fetch origin >> "$LOG_FILE" 2>&1 || true
+git merge "origin/$GIT_BRANCH" --ff-only >> "$LOG_FILE" 2>&1 || {
+    log "$LOG_FILE" "Merge failed, attempting hard reset and clean..."
     git reset --hard "origin/$GIT_BRANCH" >> "$LOG_FILE" 2>&1 || true
     git clean -fd >> "$LOG_FILE" 2>&1 || true
     

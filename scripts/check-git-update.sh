@@ -206,10 +206,10 @@ fi
 
 if ! git rev-parse --verify --quiet HEAD@{u} 2>/dev/null; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected new branch, performing initial pull..." >> "$GIT_LOG"
-    git pull "origin/$GIT_BRANCH" --ff-only 2>&1 | tee -a "$GIT_LOG" || {
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Initial pull failed, stashing local changes..." >> "$GIT_LOG"
+    git merge "origin/$GIT_BRANCH" --ff-only 2>&1 | tee -a "$GIT_LOG" || {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Initial merge failed, stashing local changes..." >> "$GIT_LOG"
         git stash 2>&1 | tee -a "$GIT_LOG" || true
-        git pull "origin/$GIT_BRANCH" --ff-only 2>&1 | tee -a "$GIT_LOG" || true
+        git merge "origin/$GIT_BRANCH" --ff-only 2>&1 | tee -a "$GIT_LOG" || true
         git stash pop 2>&1 | tee -a "$GIT_LOG" || true
     }
     ensure_scripts_executable
@@ -361,8 +361,7 @@ if [ "$SCRIPTS_CHANGED" = true ] && [ "$BACKEND_CHANGED" = false ] && [ "$FRONTE
 elif [ "$BACKEND_CHANGED" = true ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backend/API changes detected, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
-        "$SCRIPT_DIR/hot-deploy.sh"
-        DEPLOY_EXIT=$?
+        "$SCRIPT_DIR/hot-deploy.sh" && DEPLOY_EXIT=0 || DEPLOY_EXIT=$?
         if [ $DEPLOY_EXIT -ne 0 ]; then
             DEPLOY_RESULT="error"
             DEPLOY_MESSAGE="热部署失败"
@@ -427,8 +426,7 @@ $(get_last_logs "$GIT_LOG" 100)"
 else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generic update, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
-        "$SCRIPT_DIR/hot-deploy.sh"
-        DEPLOY_EXIT=$?
+        "$SCRIPT_DIR/hot-deploy.sh" && DEPLOY_EXIT=0 || DEPLOY_EXIT=$?
         if [ $DEPLOY_EXIT -ne 0 ]; then
             DEPLOY_RESULT="error"
             DEPLOY_MESSAGE="热部署失败"

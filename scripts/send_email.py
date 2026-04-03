@@ -72,10 +72,10 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
             f'<div style="margin-top:32px;">'
             f'<div style="font-size:12px;font-weight:600;color:{text_muted};-webkit-text-fill-color:{text_muted};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">Git Commit</div>'
             f'<div style="background-image:linear-gradient(#27272a,#27272a);background-color:#27272a;border-radius:12px;padding:20px;border-left:4px solid {status_color};">'
-            f'<div style="font-size:16px;font-weight:600;color:{text_primary};-webkit-text-fill-color:{text_primary};margin-bottom:8px;">{commit_title}</div>'
+            f'<div style="font-size:16px;font-weight:600;color:{text_primary};-webkit-text-fill-color:{text_primary};margin-bottom:8px;word-break:break-word;">{commit_title}</div>'
         )
         if commit_body:
-            commit_html += f'<div style="font-size:14px;color:{text_secondary};-webkit-text-fill-color:{text_secondary};line-height:1.6;white-space:pre-wrap;">{commit_body}</div>'
+            commit_html += f'<div style="font-size:14px;color:{text_secondary};-webkit-text-fill-color:{text_secondary};line-height:1.6;white-space:pre-wrap;word-break:break-all;overflow-wrap:break-word;">{commit_body}</div>'
         commit_html += f'</div></div>'
 
     details_html = ""
@@ -83,7 +83,7 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
         details_html = (
             f'<div style="margin-top:32px;">'
             f'<div style="font-size:12px;font-weight:600;color:{text_muted};-webkit-text-fill-color:{text_muted};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">详细日志</div>'
-            f'<div style="background-image:linear-gradient(#000000,#000000);background-color:#000000;border-radius:12px;padding:20px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:13px;color:#d4d4d8;-webkit-text-fill-color:#d4d4d8;line-height:1.6;white-space:pre-wrap;overflow-x:auto;border:1px solid #27272a;">{extra_details}</div>'
+            f'<div style="background-image:linear-gradient(#000000,#000000);background-color:#000000;border-radius:12px;padding:20px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:13px;color:#d4d4d8;-webkit-text-fill-color:#d4d4d8;line-height:1.6;white-space:pre-wrap;word-break:break-all;overflow-wrap:break-word;border:1px solid #27272a;">{extra_details}</div>'
             f'</div>'
         )
 
@@ -155,7 +155,7 @@ def generate_email_html(status, message, commit_title="", commit_body="", change
                         <td style="padding: 40px; background-image: linear-gradient({card_bg}, {card_bg}); background-color: {card_bg};" bgcolor="{card_bg}">
                             <div style="margin-bottom: 8px;">
                                 <div style="font-size: 12px; font-weight: 600; color: {text_muted}; -webkit-text-fill-color: {text_muted}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">运行状态</div>
-                                <div style="font-size: 20px; font-weight: 500; color: {text_primary}; -webkit-text-fill-color: {text_primary}; line-height: 1.5;">{message}</div>
+                                <div style="font-size: 20px; font-weight: 500; color: {text_primary}; -webkit-text-fill-color: {text_primary}; line-height: 1.5; word-break: break-word;">{message}</div>
                                 <div style="font-size: 14px; color: {text_secondary}; -webkit-text-fill-color: {text_secondary}; margin-top: 12px;">
                                     {current_time}
                                 </div>
