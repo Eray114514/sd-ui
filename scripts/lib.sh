@@ -96,6 +96,7 @@ EOF
 }
 
 save_version() {
+    local log_file="${1:-}"
     local version_file="$STATE_DIR/version.json"
     local commit=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
 
@@ -105,7 +106,11 @@ save_version() {
   "deployed_at": "$(date '+%Y-%m-%d %H:%M:%S')"
 }
 EOF
-    log "Version saved: $commit"
+    if [ -n "$log_file" ]; then
+        log "$log_file" "Version saved: $commit"
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Version saved: $commit"
+    fi
 }
 
 get_current_version() {

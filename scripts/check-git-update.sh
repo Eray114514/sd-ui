@@ -171,7 +171,7 @@ fi
 cd "$APP_DIR"
 
 if [ -z "${SSH_AUTH_SOCK:-}" ]; then
-    if [ -S "$XDG_RUNTIME_DIR/ssh-agent.socket" ]; then
+    if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -S "$XDG_RUNTIME_DIR/ssh-agent.socket" ]; then
         export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"
     else
         for sock in $(find /tmp -type s -name "agent.*" -user "$USER" 2>/dev/null); do
@@ -197,7 +197,7 @@ fi
 CURRENT_VERSION=$(get_current_version)
 if [ "$LOCAL_HASH" != "$CURRENT_VERSION" ] && [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected manual pull, updating version..." >> "$GIT_LOG"
-    save_version
+    save_version "$GIT_LOG"
 fi
 
 if [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
@@ -213,7 +213,7 @@ if ! git rev-parse --verify --quiet HEAD@{u} 2>/dev/null; then
         git stash pop 2>&1 | tee -a "$GIT_LOG" || true
     }
     ensure_scripts_executable
-    save_version
+    save_version "$GIT_LOG"
     notify "$GIT_LOG" "success" "首次部署完成" "" "" "" "新分支初始化完成"
     exit 0
 fi
@@ -451,7 +451,7 @@ $(get_last_logs "$LOG_DIR/hot-deploy.log" 100)"
     fi
 fi
 
-save_version
+save_version "$GIT_LOG"
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))

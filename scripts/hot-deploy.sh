@@ -453,7 +453,7 @@ if [ -n "$HEALTH_ISSUES" ]; then
     DEPLOY_DETAILS="$DEPLOY_DETAILS | 健康检查修复的问题: $HEALTH_ISSUES"
 fi
 
-save_version
+save_version "$LOG_FILE"
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
