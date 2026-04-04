@@ -6,7 +6,8 @@
 ![React](https://img.shields.io/badge/React-19.2-blue?style=flat-square&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-4-38B2AC?style=flat-square&logo=tailwind-css)
-![Prisma](https://img.shields.io/badge/Prisma-5.22-2D3748?style=flat-square&logo=prisma)
+![Prisma](https://img.shields.io/badge/Prisma-6.0-2D3748?style=flat-square&logo=prisma)
+![Vitest](https://img.shields.io/badge/Vitest-4.1-729B1B?style=flat-square&logo=vitest)
 
 ## ✨ 功能特性
 
@@ -52,9 +53,12 @@
 | **开发语言** | TypeScript 5 |
 | **样式方案** | Tailwind CSS 4 + shadcn/ui + @base-ui/react |
 | **状态管理** | Zustand 5（持久化存储） |
-| **数据库** | SQLite + Prisma ORM |
+| **数据库** | SQLite + Prisma ORM 6 |
 | **HTTP 客户端** | Axios |
+| **数据校验** | Zod |
+| **测试框架** | Vitest + React Testing Library |
 | **图标库** | Lucide React |
+| **日志组件** | Pino |
 | **通知组件** | Sonner |
 
 ## 📁 项目结构
@@ -63,23 +67,30 @@
 sd-ui/
 ├── package.json              # 根目录依赖（Zustand）
 ├── README.md                  # 项目说明文档
-├── logs/                      # 日志目录
+├── logs/                      # 日志目录（运行时生成）
 │   └── app.log
 │
-├── scripts/                   # 启动脚本
+├── scripts/                   # 部署和启动脚本
 │   ├── start_windows.bat      # Windows 启动脚本
 │   ├── start_windows.ps1      # Windows PowerShell 脚本
 │   ├── start_sd_ui_ubuntu.sh  # Ubuntu 启动脚本
-│   └── enable_autostart_ubuntu.sh  # Ubuntu 开机自启配置
+│   ├── enable_autostart_ubuntu.sh  # Ubuntu 开机自启配置
+│   ├── hot-deploy.sh          # 热更新部署脚本
+│   ├── rollback.sh            # 部署回滚脚本
+│   ├── check-git-update.sh    # Git 更新检查脚本
+│   ├── send_email.py          # 邮件通知脚本
+│   ├── install_resend_sdk.sh  # 邮件 SDK 安装脚本
+│   └── nginx-dev.conf         # Nginx 开发配置
 │
 └── ui/                        # 主项目目录
     ├── package.json           # 项目依赖配置
     ├── next.config.mjs        # Next.js 配置
     ├── tsconfig.json          # TypeScript 配置
-    ├── tailwind.config.ts     # Tailwind CSS 配置
     ├── postcss.config.mjs     # PostCSS 配置
     ├── components.json        # shadcn/ui 组件配置
     ├── eslint.config.mjs      # ESLint 配置
+    ├── vitest.config.ts       # Vitest 测试配置
+    ├── vitest.setup.ts        # Vitest 测试环境初始化
     │
     ├── prisma/
     │   ├── schema.prisma      # 数据库模型定义
@@ -132,7 +143,9 @@ sd-ui/
         │   ├── sdConfig.ts    # SD WebUI 配置
         │   ├── cache.ts       # 缓存管理
         │   ├── constants.ts   # 常量定义
-        │   └── pollingManager.ts  # 轮询管理器
+        │   ├── pollingManager.ts  # 轮询管理器
+        │   ├── logger.ts      # 日志记录器（Pino）
+        │   └── env.ts         # 环境变量校验（Zod）
         │
         ├── services/          # 服务层
         │   ├── apiClient.ts       # API 客户端封装
@@ -371,6 +384,20 @@ UI_CONSTANTS = {
 
 ## 🔧 开发指南
 
+### 运行测试
+
+项目集成了 Vitest 和 React Testing Library 进行单元测试和组件测试：
+```bash
+# 运行测试
+npm run test
+
+# 运行测试并监听文件更改
+npm run test:run
+
+# 生成测试覆盖率报告
+npm run test:coverage
+```
+
 ### 添加新组件
 
 使用 shadcn/ui CLI 添加组件：
@@ -397,6 +424,16 @@ npx prisma generate
 ```bash
 npm run lint
 ```
+
+### 自动部署 (CI/CD)
+
+项目包含一套基于 Shell 脚本的轻量级自动化部署方案，支持：
+- Git 变动检测和自动拉取
+- 热更新部署 (`hot-deploy.sh`)，使用 pm2 实现零停机更新
+- 失败自动回滚 (`rollback.sh`)
+- 邮件状态通知 (`send_email.py`)
+
+配置方法请参考 `scripts/AUTODEPLOYMENT_README.md`。
 
 ## 📝 注意事项
 
