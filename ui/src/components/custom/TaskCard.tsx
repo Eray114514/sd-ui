@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner"
 import { useGenerationStore } from "@/store/generationStore"
 import { parseError } from "@/errors/errorHandler"
+import { copyToClipboard } from "@/lib/utils"
 import type { Task, GeneratedImage, ProgressData, ParsedErrorDetails, ImageWithTask } from "@/types"
 import { useState, useCallback, memo } from "react"
 import { deleteAsset, updateAsset, getAssetDownloadUrl } from "@/services/assetsService"
@@ -115,9 +116,13 @@ export const TaskCard = memo(function TaskCard({ task, progressData, setSelected
     }
   }, [task])
 
-  const handleCopyPrompt = useCallback(() => {
-    navigator.clipboard.writeText(task.prompt)
-    toast.success("提示词已复制")
+  const handleCopyPrompt = useCallback(async () => {
+    const success = await copyToClipboard(task.prompt)
+    if (success) {
+      toast.success("提示词已复制")
+    } else {
+      toast.error("复制失败")
+    }
   }, [task.prompt])
 
   const toggleError = useCallback((taskId: string) => {
@@ -132,13 +137,14 @@ export const TaskCard = memo(function TaskCard({ task, progressData, setSelected
     })
   }, [])
 
-  const copyErrorDetails = useCallback((errorDetails: ParsedErrorDetails) => {
+  const copyErrorDetails = useCallback(async (errorDetails: ParsedErrorDetails) => {
     const textToCopy = JSON.stringify(errorDetails, null, 2)
-    navigator.clipboard.writeText(textToCopy).then(() => {
+    const success = await copyToClipboard(textToCopy)
+    if (success) {
       toast.success("错误详情已复制到剪贴板")
-    }).catch(() => {
+    } else {
       toast.error("复制失败")
-    })
+    }
   }, [])
 
   return (
