@@ -15,7 +15,7 @@ const databaseUrl = `file:${dbPath}`
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({
     datasources: {
         db: {
-            url: databaseUrl + "?connection_limit=5&pool_timeout=10"
+            url: databaseUrl
         }
     }
 })

@@ -6,7 +6,17 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const prisma = new PrismaClient();
+const dbPath = process.env.DATABASE_URL
+  ? process.env.DATABASE_URL.replace(/^file:/, '')
+  : path.join(__dirname, '..', 'prisma', 'dev.db');
+
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: `file:${dbPath}`
+    }
+  }
+});
 
 async function scanAndImportImages() {
   console.log('=== 开始扫描图片目录 ===\n');
