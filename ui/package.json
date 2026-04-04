@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "node scripts/sync-standalone-static.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",

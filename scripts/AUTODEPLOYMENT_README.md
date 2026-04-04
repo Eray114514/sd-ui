@@ -53,7 +53,6 @@ Linux 服务器 (自动检测 + 部署)
 | `check-git-update.sh`        | `scripts/` | Cron 调用，检测更新并触发部署               |
 | `hot-deploy.sh`              | `scripts/` | 完整热部署：备份→安装依赖→构建→重启         |
 | `send_email.py`              | `scripts/` | Python 发邮件脚本，通过 Resend API 发送通知 |
-| `sync-standalone-static.mjs` | `scripts/` | Next.js standalone 模式静态文件同步         |
 | `nginx-dev.conf`             | `scripts/` | Nginx 反向代理配置（端口 3000→3001）        |
 
 ### 目录结构
@@ -63,15 +62,13 @@ sd-ui/
 ├── scripts/                    # 部署脚本
 │   ├── check-git-update.sh     # ← Cron 每分钟执行
 │   ├── hot-deploy.sh           # 完整热部署
-│   ├── sync-standalone-static.mjs
 │   ├── nginx-dev.conf
 │   └── enable_autostart_ubuntu.sh
 ├── ui/                         # Next.js 应用
 │   ├── prisma/
 │   │   ├── schema.prisma
 │   │   └── dev.db             # SQLite 数据库
-│   ├── .next/
-│   │   └── standalone/         # Next.js 独立部署模式
+│   ├── .next/                  # Next.js 构建产物
 │   └── src/
 └── ...
 
@@ -593,7 +590,7 @@ curl -f http://localhost:3001/api/health || exit 1
 
 ```bash
 # 保存当前版本
-cp -r ~/.next/standalone ~/.local/share/sd-ui/backups/$(date +%Y%m%d_%H%M%S)/
+cp -r ~/.next ~/.local/share/sd-ui/backups/$(date +%Y%m%d_%H%M%S)/
 
 # 回滚到指定版本
 git checkout <previous-tag>

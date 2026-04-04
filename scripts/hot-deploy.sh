@@ -25,11 +25,6 @@ HEALTH_ISSUES=""
 
 health_check() {
     local issues=()
-    local standalone_dir="$APP_DIR/.next/standalone"
-    local static_src="$APP_DIR/.next/static"
-    local static_dest="$standalone_dir/.next/static"
-    local public_src="$APP_DIR/public"
-    local public_dest="$standalone_dir/public"
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Health Check Start ===" >> "$HEALTH_CHECK_LOG"
 
@@ -38,23 +33,9 @@ health_check() {
         echo "[Health] node_modules missing" >> "$HEALTH_CHECK_LOG"
     fi
 
-    if [ ! -f "$standalone_dir/server.js" ]; then
-        issues+=("standalone build missing")
-        echo "[Health] standalone build missing" >> "$HEALTH_CHECK_LOG"
-    fi
-
-    if [ -d "$static_src" ]; then
-        if [ ! -d "$static_dest" ] || [ -z "$(ls -A "$static_dest" 2>/dev/null)" ]; then
-            issues+=("static files missing")
-            echo "[Health] static files missing in standalone" >> "$HEALTH_CHECK_LOG"
-        fi
-    fi
-
-    if [ -d "$public_src" ]; then
-        if [ ! -d "$public_dest" ] || [ -z "$(ls -A "$public_dest" 2>/dev/null)" ]; then
-            issues+=("public files missing")
-            echo "[Health] public files missing in standalone" >> "$HEALTH_CHECK_LOG"
-        fi
+    if [ ! -f "$APP_DIR/.next/BUILD_ID" ]; then
+        issues+=("nextjs build missing")
+        echo "[Health] nextjs build missing" >> "$HEALTH_CHECK_LOG"
     fi
 
     if [ -f "$APP_DIR/prisma/schema.prisma" ]; then
@@ -85,7 +66,7 @@ health_check() {
 
     for issue in "${issues[@]}"; do
         case "$issue" in
-            "node_modules missing"|"standalone build missing")
+            "node_modules missing"|"nextjs build missing")
                 need_rebuild=true
                 ;;
             "prisma migration pending")
@@ -103,37 +84,8 @@ health_check() {
         npm install >> "$HEALTH_CHECK_LOG" 2>&1 || true
         npx prisma generate >> "$HEALTH_CHECK_LOG" 2>&1 || true
         npm run build >> "$HEALTH_CHECK_LOG" 2>&1 || true
-
-        if [ -f "$APP_DIR/scripts/sync-standalone-static.mjs" ]; then
-            node "$APP_DIR/scripts/sync-standalone-static.mjs" >> "$HEALTH_CHECK_LOG" 2>&1 || true
-        fi
-
-        if [ -d "$public_src" ] && [ -d "$standalone_dir" ]; then
-            mkdir -p "$public_dest"
-            cp -r "$public_src/"* "$public_dest/" 2>/dev/null || true
-        fi
         cd "$REPO_DIR"
         log "$LOG_FILE" "Health repair: Rebuild complete"
-    else
-        if [ ! -d "$standalone_dir" ]; then
-            log "$LOG_FILE" "Health repair: standalone dir not found, skipping file sync"
-            return 1
-        fi
-
-        for issue in "${issues[@]}"; do
-            case "$issue" in
-                "static files missing")
-                    log "$LOG_FILE" "Health repair: Syncing static files..."
-                    mkdir -p "$static_dest"
-                    cp -r "$static_src/"* "$static_dest/" 2>/dev/null || true
-                    ;;
-                "public files missing")
-                    log "$LOG_FILE" "Health repair: Syncing public files..."
-                    mkdir -p "$public_dest"
-                    cp -r "$public_src/"* "$public_dest/" 2>/dev/null || true
-                    ;;
-            esac
-        done
     fi
 
     if [ "$need_db_push" = true ]; then
@@ -281,26 +233,6 @@ run_prisma_migrate() {
     return $exit_code
 }
 
-sync_public_files() {
-    local standalone_dir="$APP_DIR/.next/standalone"
-    local public_src="$APP_DIR/public"
-    local public_dest="$standalone_dir/public"
-
-    if [ ! -d "$standalone_dir" ]; then
-        log "$LOG_FILE" "Standalone directory not found, skipping public sync"
-        return
-    fi
-
-    if [ ! -d "$public_src" ]; then
-        log "$LOG_FILE" "Public directory not found, skipping public sync"
-        return
-    fi
-
-    mkdir -p "$public_dest"
-    cp -r "$public_src/"* "$public_dest/" 2>/dev/null || true
-    log "$LOG_FILE" "Public files synced to: $public_dest"
-}
-
 commit_lock_file() {
     local lock_file=""
     if [ -f "$APP_DIR/package-lock.json" ]; then
@@ -431,8 +363,6 @@ $(get_last_logs "$LOG_FILE" 100)"
         exit 1
     fi
 fi
-
-sync_public_files
 
 commit_lock_file
 

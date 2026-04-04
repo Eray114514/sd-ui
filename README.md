@@ -99,8 +99,7 @@ sd-ui/
     ├── public/                # 静态资源
     │
     ├── scripts/               # 工具脚本
-    │   ├── recover-images.js  # 图片恢复脚本
-    │   └── sync-standalone-static.mjs  # 静态资源同步脚本
+    │   └── recover-images.js  # 图片恢复脚本
     │
     └── src/
         ├── app/               # Next.js App Router

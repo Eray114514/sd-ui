@@ -51,21 +51,6 @@ $(get_last_logs "$LOG_FILE" 100)"
     exit 1
 fi
 
-if [ -f "$APP_DIR/scripts/sync-standalone-static.mjs" ]; then
-    log "$LOG_FILE" "Syncing static files..."
-    node "$APP_DIR/scripts/sync-standalone-static.mjs" >> "$LOG_FILE" 2>&1 || true
-fi
-
-standalone_dir="$APP_DIR/.next/standalone"
-public_src="$APP_DIR/public"
-public_dest="$standalone_dir/public"
-
-if [ -d "$standalone_dir" ] && [ -d "$public_src" ]; then
-    mkdir -p "$public_dest"
-    cp -r "$public_src/"* "$public_dest/" 2>/dev/null || true
-    log "$LOG_FILE" "Public files synced"
-fi
-
 log "$LOG_FILE" "Restarting service..."
 systemctl --user restart "$SERVICE_NAME" 2>/dev/null || {
     log "$LOG_FILE" "WARNING: systemctl restart failed, trying alternative..."
