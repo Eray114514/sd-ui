@@ -176,17 +176,32 @@ export function ControlPanel() {
     setDimensions(w, h)
   }
 
-  const handleTextareaInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setPrompt(e.target.value)
+  const adjustTextareaHeight = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
 
-    // 先将高度重置为 0，再读 scrollHeight，这样清空文本后才能正确缩小
-    const el = e.target
+    const originalTransition = el.style.transition
+    el.style.transition = 'none'
+    
     el.style.height = '0px'
     const newHeight = Math.min(el.scrollHeight, UI_CONSTANTS.CONTROL_PANEL.MAX_TEXTAREA_HEIGHT)
     const finalHeight = Math.max(newHeight, UI_CONSTANTS.CONTROL_PANEL.MIN_TEXTAREA_HEIGHT)
     el.style.height = finalHeight + 'px'
+    
+    void el.offsetHeight
+    el.style.transition = originalTransition
+    
     setTextareaHeight(finalHeight)
+  }, [])
+
+  const handleTextareaInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setPrompt(e.target.value)
+    // adjustTextareaHeight will be called by useEffect when prompt changes
   }, [setPrompt])
+
+  useEffect(() => {
+    adjustTextareaHeight()
+  }, [prompt, isExpanded, adjustTextareaHeight])
 
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
