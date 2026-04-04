@@ -210,17 +210,22 @@ install_prisma_if_needed() {
 
 run_npm_install() {
     log "$LOG_FILE" "Installing dependencies..."
-    npm install >> "$LOG_FILE" 2>&1
+    
+    if [ -f "$APP_DIR/package-lock.json" ]; then
+        log "$LOG_FILE" "Using npm ci for reliable installation..."
+        npm ci >> "$LOG_FILE" 2>&1
+    else
+        log "$LOG_FILE" "Using npm install (no package-lock.json found)..."
+        npm install >> "$LOG_FILE" 2>&1
+    fi
+    
     local exit_code=$?
 
     if [ $exit_code -ne 0 ]; then
-        log "$LOG_FILE" "npm install failed with exit code $exit_code, retrying..."
-
-        if [ -f "$APP_DIR/package-lock.json" ]; then
-            log "$LOG_FILE" "Removing package-lock.json and retrying..."
-            rm -f "$APP_DIR/package-lock.json"
-        fi
-
+        log "$LOG_FILE" "Dependency installation failed with exit code $exit_code, retrying with clean install..."
+        
+        rm -rf "$APP_DIR/node_modules" "$APP_DIR/package-lock.json"
+        
         npm install >> "$LOG_FILE" 2>&1
         exit_code=$?
 
