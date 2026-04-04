@@ -69,7 +69,7 @@ export async function GET(req: Request) {
         if (shouldUpdatePath) {
             prisma.generatedImage.findFirst({
                 where: { path: originalPath }
-            }).then((image) => {
+            }).then((image: any) => {
                 if (image) {
                     return prisma.generatedImage.update({
                         where: { id: image.id },
