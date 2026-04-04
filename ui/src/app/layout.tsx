@@ -23,6 +23,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('error', function(event) {
+                if (event.message && (event.message.includes('Loading chunk') || event.message.includes('ChunkLoadError'))) {
+                  console.warn('ChunkLoadError detected, reloading page...');
+                  window.location.reload();
+                }
+              });
+            `,
+          }}
+        />
+      </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <div className="flex min-h-screen bg-background text-foreground pl-sidebar">
