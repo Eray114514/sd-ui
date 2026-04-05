@@ -20,6 +20,7 @@ export const generateRequestSchema = z.object({
 
 export const settingsUpdateSchema = z.object({
     imageDir: z.string().min(1, '图片目录不能为空'),
+    activeLoras: z.string().optional(),
 })
 
 export const createTaskSchema = z.object({

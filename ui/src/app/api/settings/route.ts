@@ -32,19 +32,24 @@ export async function GET() {
 export async function POST(req: Request) {
     try {
         const body = await req.json()
-        const { imageDir } = settingsUpdateSchema.parse(body)
+        const { imageDir, activeLoras } = settingsUpdateSchema.parse(body)
 
-        logger.info({ imageDir }, 'Updating settings')
+        logger.info({ imageDir, activeLoras }, 'Updating settings')
 
         const normalizedDir = normalizeImageDir(imageDir)
+        const updateData: { imageDir: string; activeLoras?: string } = { imageDir: normalizedDir }
+        if (activeLoras !== undefined) {
+            updateData.activeLoras = activeLoras
+        }
+
         const config = await prisma.systemConfig.upsert({
             where: { id: 'default' },
-            update: { imageDir: normalizedDir },
-            create: { id: "default", imageDir: normalizedDir }
+            update: updateData,
+            create: { id: "default", imageDir: normalizedDir, activeLoras: activeLoras || "[]" }
         })
 
         apiCache.invalidate(cacheKeys.settings)
-        logger.info({ imageDir: normalizedDir }, 'Settings updated')
+        logger.info({ imageDir: normalizedDir, activeLoras }, 'Settings updated')
 
         return NextResponse.json(config)
     } catch (error) {

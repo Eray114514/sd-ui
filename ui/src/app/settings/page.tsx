@@ -13,22 +13,32 @@ export default function SettingsPage() {
     const [imageDir, setImageDir] = useState("")
     const [models, setModels] = useState<{ id: string, name: string }[]>([])
     const [styles, setStyles] = useState<{ id: string, name: string }[]>([])
+    const [loras, setLoras] = useState<{ id: string, name: string }[]>([])
+    const [activeLoras, setActiveLoras] = useState<string[]>([])
     const [newModel, setNewModel] = useState("")
     const [newStyle, setNewStyle] = useState("")
+    const [newLora, setNewLora] = useState("")
     const [showDirPicker, setShowDirPicker] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
 
     const fetchData = useCallback(async () => {
         try {
             setIsLoading(true)
-            const [settingsRes, modelsRes, stylesRes] = await Promise.all([
+            const [settingsRes, modelsRes, stylesRes, lorasRes] = await Promise.all([
                 axios.get('/api/settings'),
                 axios.get('/api/models'),
-                axios.get('/api/styles')
+                axios.get('/api/styles'),
+                axios.get('/api/loras')
             ])
             setImageDir(settingsRes.data?.imageDir || "")
+            try {
+                setActiveLoras(JSON.parse(settingsRes.data?.activeLoras || "[]"))
+            } catch {
+                setActiveLoras([])
+            }
             setModels(modelsRes.data || [])
             setStyles(stylesRes.data || [])
+            setLoras(lorasRes.data || [])
 
             const defaultModel = "waiillustriousSDXL_v160.safetensors"
             const hasDefault = modelsRes.data?.some((m: { name: string }) => m.name === defaultModel)
@@ -60,7 +70,10 @@ export default function SettingsPage() {
 
     const saveSettings = async () => {
         try {
-            await axios.post('/api/settings', { imageDir })
+            await axios.post('/api/settings', { 
+                imageDir, 
+                activeLoras: JSON.stringify(activeLoras) 
+            })
             toast.success("设置已保存")
         } catch {
             toast.error("保存设置失败")
@@ -108,6 +121,47 @@ export default function SettingsPage() {
             toast.success("风格已删除")
         } catch {
             toast.error("删除风格失败")
+        }
+    }
+
+    const addLora = async () => {
+        if (!newLora.trim()) return
+        try {
+            await axios.post('/api/loras', { name: newLora })
+            setNewLora("")
+            fetchData()
+            toast.success("LoRA已添加")
+        } catch {
+            toast.error("添加LoRA失败")
+        }
+    }
+
+    const removeLora = async (id: string) => {
+        try {
+            await axios.delete('/api/loras', { data: { id } })
+            // If the deleted LoRA was active, remove it from activeLoras
+            const loraObj = loras.find(l => l.id === id)
+            if (loraObj && activeLoras.includes(loraObj.name)) {
+                const newActive = activeLoras.filter(name => name !== loraObj.name)
+                setActiveLoras(newActive)
+                await axios.post('/api/settings', { imageDir, activeLoras: JSON.stringify(newActive) })
+            }
+            fetchData()
+            toast.success("LoRA已删除")
+        } catch {
+            toast.error("删除LoRA失败")
+        }
+    }
+
+    const toggleActiveLora = async (name: string) => {
+        const newActive = activeLoras.includes(name)
+            ? activeLoras.filter(n => n !== name)
+            : [...activeLoras, name]
+        setActiveLoras(newActive)
+        try {
+            await axios.post('/api/settings', { imageDir, activeLoras: JSON.stringify(newActive) })
+        } catch {
+            toast.error("保存活动LoRA失败")
         }
     }
 
@@ -271,6 +325,65 @@ export default function SettingsPage() {
                                             </Button>
                                         </div>
                                     ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* LoRA Management */}
+                    <div className="bg-card border border-border/50 rounded-3xl p-6 shadow-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="p-2 bg-orange-500/10 rounded-xl text-orange-500">
+                                <Database className="w-5 h-5" />
+                            </div>
+                            <h2 className="text-xl font-semibold">LoRA 管理</h2>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-6">
+                            添加 LoRA 标签并在下方选择启用。启用的 LoRA 将自动添加到每次生成的提示词中。
+                        </p>
+                        
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>添加新 LoRA（格式：&lt;lora:name:weight&gt;）</Label>
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <Input
+                                        value={newLora}
+                                        onChange={(e) => setNewLora(e.target.value)}
+                                        placeholder="例如：<lora:cute_style:0.8>"
+                                        className="flex-1 rounded-xl bg-secondary/30 border-border/50"
+                                    />
+                                    <Button onClick={addLora} variant="secondary" className="rounded-xl shrink-0 gap-2 w-full sm:w-auto hover:bg-primary hover:text-primary-foreground transition-colors">
+                                        <PlusIcon className="w-4 h-4" />
+                                        添加 LoRA
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="mt-6">
+                                <Label className="text-muted-foreground mb-3 block">已添加的 LoRA（点击切换启用状态）</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {loras.map(l => {
+                                        const isActive = activeLoras.includes(l.name)
+                                        return (
+                                            <div 
+                                                key={l.id} 
+                                                className={`flex items-center gap-2 border pl-3 pr-1.5 py-1.5 rounded-full group transition-colors cursor-pointer select-none ${isActive ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-secondary/40 border-border/50 hover:bg-secondary/60'}`}
+                                                onClick={() => toggleActiveLora(l.name)}
+                                            >
+                                                <span className="text-sm font-medium">{l.name}</span>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-6 w-6 rounded-full text-muted-foreground opacity-50 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all" 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        removeLora(l.id)
+                                                    }}
+                                                >
+                                                    <TrashIcon className="w-3.5 h-3.5" />
+                                                </Button>
+                                            </div>
+                                        )
+                                    })}
                                 </div>
                             </div>
                         </div>

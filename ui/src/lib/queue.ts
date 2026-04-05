@@ -87,8 +87,19 @@ export async function processQueue() {
             })
 
             try {
+                const config = await prisma.systemConfig.findUnique({ where: { id: 'default' } })
+                let activeLoras = []
+                try {
+                    activeLoras = JSON.parse(config?.activeLoras || "[]")
+                } catch {
+                    activeLoras = []
+                }
+                
+                const loraString = activeLoras.length > 0 ? " " + activeLoras.join(", ") : ""
+                const finalPrompt = task.prompt + loraString
+
                 const payload = {
-                    prompt: task.prompt,
+                    prompt: finalPrompt,
                     negative_prompt: task.negative_prompt || "",
                     styles: JSON.parse(task.styles),
                     sampler_name: task.sampler_name,
@@ -125,7 +136,6 @@ export async function processQueue() {
 
                 logger.debug({ taskId: task.id, imageCount: images.length }, 'Received images')
 
-                const config = await prisma.systemConfig.findUnique({ where: { id: 'default' } })
                 const imageDir = normalizeImageDir(config?.imageDir || getDefaultImageDir())
 
                 try {
