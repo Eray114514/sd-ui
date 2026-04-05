@@ -20,7 +20,7 @@ PREVIOUS_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
 load_env_file
 
 if ! validate_env; then
-    notify "$LOG_FILE" "error" "环境变量缺失" "缺少必要的环境变量，请检查 .env 文件" "" "" ""
+    notify "$LOG_FILE" "error" "环境变量缺失" "缺少必要的环境变量，请检查 .env 文件" "${COMMIT_TITLE:-}" "${COMMIT_BODY:-}" "${CHANGED_FILES:-}"
     exit 1
 fi
 
@@ -313,7 +313,7 @@ if [ -n "$PREVIOUS_COMMIT" ]; then
 
 $(get_last_logs "$LOG_FILE" 100)"
             log "$LOG_FILE" "ERROR: npm install failed after retry"
-            notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
+            notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "${COMMIT_TITLE:-}" "${COMMIT_BODY:-}" "${CHANGED_FILES:-}" "$DEPLOY_DETAILS"
             exit 1
         fi
     else
@@ -327,7 +327,7 @@ else
 
 $(get_last_logs "$LOG_FILE" 100)"
         log "$LOG_FILE" "ERROR: npm install failed after retry"
-        notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
+        notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "${COMMIT_TITLE:-}" "${COMMIT_BODY:-}" "${CHANGED_FILES:-}" "$DEPLOY_DETAILS"
         exit 1
     fi
 fi
@@ -339,7 +339,7 @@ if ! run_prisma_generate; then
 
 $(get_last_logs "$LOG_FILE" 100)"
     log "$LOG_FILE" "ERROR: Prisma generate failed"
-    notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
+    notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "${COMMIT_TITLE:-}" "${COMMIT_BODY:-}" "${CHANGED_FILES:-}" "$DEPLOY_DETAILS"
     exit 1
 fi
 
@@ -370,7 +370,7 @@ if [ $build_exit_code -ne 0 ]; then
 
 $(get_last_logs "$LOG_FILE" 100)"
         log "$LOG_FILE" "ERROR: Build failed after retry"
-        notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
+        notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "${COMMIT_TITLE:-}" "${COMMIT_BODY:-}" "${CHANGED_FILES:-}" "$DEPLOY_DETAILS"
         exit 1
     fi
 fi
@@ -409,4 +409,4 @@ DURATION=$((END_TIME - START_TIME))
 record_stats "$DEPLOY_RESULT" "$DURATION" "$(git rev-parse HEAD 2>/dev/null || echo 'unknown')" "$HEALTH_ISSUES"
 
 log "$LOG_FILE" "=== Hot deployment complete (duration: ${DURATION}s) ==="
-notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "" "" "" "$DEPLOY_DETAILS"
+notify "$LOG_FILE" "$DEPLOY_RESULT" "$DEPLOY_MESSAGE" "${COMMIT_TITLE:-}" "${COMMIT_BODY:-}" "${CHANGED_FILES:-}" "$DEPLOY_DETAILS"
