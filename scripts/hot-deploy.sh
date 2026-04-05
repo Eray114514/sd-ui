@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
@@ -106,7 +109,7 @@ health_check() {
 
     if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
         log "$LOG_FILE" "Health repair: Restarting service..."
-        systemctl --user restart "$SERVICE_NAME" 2>/dev/null || true
+        systemctl --user restart "$SERVICE_NAME"
     fi
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Health Check End (Repaired) ===" >> "$HEALTH_CHECK_LOG"
@@ -370,9 +373,9 @@ log "$LOG_FILE" "Waiting for current processing tasks before restart..."
 wait_for_processing_tasks
 
 log "$LOG_FILE" "Restarting service..."
-systemctl --user restart "$SERVICE_NAME" 2>/dev/null || {
-    log "$LOG_FILE" "WARNING: systemctl restart failed, trying alternative..."
-    systemctl --user restart "$SERVICE_NAME" || true
+systemctl --user restart "$SERVICE_NAME" || {
+    log "$LOG_FILE" "WARNING: systemctl restart failed"
+    exit 1
 }
 
 sleep 3

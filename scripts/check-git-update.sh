@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
@@ -102,10 +105,10 @@ health_check() {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Migration complete" >> "$GIT_LOG"
     fi
 
-    if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Restarting service..." >> "$GIT_LOG"
-        systemctl --user restart "$SERVICE_NAME" 2>/dev/null || true
-    fi
+        if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Restarting service..." >> "$GIT_LOG"
+            systemctl --user restart "$SERVICE_NAME"
+        fi
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Health Check End (Repaired) ===" >> "$HEALTH_CHECK_LOG"
 
@@ -203,7 +206,7 @@ if [ -n "$LOCAL_CHANGES" ]; then
             CONFLICTS=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
             if [ -n "$CONFLICTS" ]; then
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected conflicts: $CONFLICTS" >> "$GIT_LOG"
-                git checkout --theirs . 2>/dev/null || true
+                git checkout --ours . 2>/dev/null || true
                 git add -A 2>/dev/null || true
             fi
         fi
@@ -218,7 +221,7 @@ if [ -n "$LOCAL_CHANGES" ]; then
             CONFLICTS=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
             if [ -n "$CONFLICTS" ]; then
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected conflicts: $CONFLICTS" >> "$GIT_LOG"
-                git checkout --theirs . 2>/dev/null || true
+                git checkout --ours . 2>/dev/null || true
                 git add -A 2>/dev/null || true
             fi
         fi
@@ -276,7 +279,10 @@ for file in $CHANGED_FILES; do
         ui/src/*|ui/*.css|ui/components.json|ui/public/*)
             FRONTEND_ONLY=true
             ;;
-        *.md|README*|LICENSE|CONTRIBUTING*|.gitignore|.env*|*.yml|*.yaml)
+        *.md)
+            FRONTEND_ONLY=true
+            ;;
+        README*|LICENSE|CONTRIBUTING*|.gitignore|.env*|*.yml|*.yaml)
             ;;
         *)
             ;;
@@ -355,7 +361,7 @@ $(get_last_logs "$GIT_LOG" 100)"
     fi
 
     wait_for_processing_tasks
-    systemctl --user restart "$SERVICE_NAME" 2>/dev/null || true
+    systemctl --user restart "$SERVICE_NAME"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend rebuilt and restarted successfully" >> "$GIT_LOG"
     DEPLOY_MESSAGE="前端更新完成"
     DEPLOY_DETAILS="前端变更已构建并重启服务"
