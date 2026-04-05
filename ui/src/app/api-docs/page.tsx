@@ -105,6 +105,23 @@ export default function ApiDocsPage() {
   }'`}
                                 </pre>
                             </div>
+
+                            <h3 className="font-semibold text-sm text-foreground/80 mt-6">响应示例 (JSON)</h3>
+                            <div className="bg-zinc-950 rounded-2xl p-4 overflow-x-auto border border-zinc-800">
+                                <pre className="text-zinc-300 text-sm font-mono leading-relaxed">
+{`{
+  "success": true,
+  "data": {
+    "task": {
+      "id": "cm7ymm...",
+      "prompt": "1girl, beautiful, masterpiece",
+      "status": "pending",
+      "createdAt": "2024-03-20T12:00:00.000Z"
+    }
+  }
+}`}
+                                </pre>
+                            </div>
                         </div>
                     </div>
 
@@ -125,6 +142,27 @@ export default function ApiDocsPage() {
 {`fetch('http://localhost:3000/api/tasks')
   .then(res => res.json())
   .then(data => console.log(data));`}
+                                </pre>
+                            </div>
+
+                            <h3 className="font-semibold text-sm text-foreground/80 mt-6">响应示例 (JSON)</h3>
+                            <div className="bg-zinc-950 rounded-2xl p-4 overflow-x-auto border border-zinc-800">
+                                <pre className="text-zinc-300 text-sm font-mono leading-relaxed">
+{`[
+  {
+    "id": "cm7ymm...",
+    "prompt": "1girl, beautiful, masterpiece",
+    "status": "completed",
+    "images": [
+      {
+        "id": "cm7ymm_img...",
+        "path": "C:\\path\\to\\image.png",
+        "createdAt": "2024-03-20T12:00:10.000Z"
+      }
+    ],
+    "createdAt": "2024-03-20T12:00:00.000Z"
+  }
+]`}
                                 </pre>
                             </div>
                         </div>
@@ -173,6 +211,18 @@ payload = {"id": "task_1234567890"}
 
 response = requests.delete(url, json=payload)
 print(response.json())`}
+                                </pre>
+                            </div>
+
+                            <h3 className="font-semibold text-sm text-foreground/80 mt-6">响应示例 (JSON)</h3>
+                            <div className="bg-zinc-950 rounded-2xl p-4 overflow-x-auto border border-zinc-800">
+                                <pre className="text-zinc-300 text-sm font-mono leading-relaxed">
+{`{
+  "success": true,
+  "data": {
+    "deleted": true
+  }
+}`}
                                 </pre>
                             </div>
                         </div>
