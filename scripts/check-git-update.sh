@@ -79,6 +79,11 @@ health_check() {
         esac
     done
 
+    if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Stopping service to prevent build conflicts..." >> "$GIT_LOG"
+        systemctl --user stop "$SERVICE_NAME" || true
+    fi
+
     if [ "$need_rebuild" = true ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Running full rebuild..." >> "$GIT_LOG"
         cd "$APP_DIR"
@@ -105,10 +110,10 @@ health_check() {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Migration complete" >> "$GIT_LOG"
     fi
 
-        if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Restarting service..." >> "$GIT_LOG"
-            systemctl --user restart "$SERVICE_NAME"
-        fi
+    if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Starting service..." >> "$GIT_LOG"
+        systemctl --user start "$SERVICE_NAME"
+    fi
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Health Check End (Repaired) ===" >> "$HEALTH_CHECK_LOG"
 
@@ -343,6 +348,11 @@ $(get_last_logs "$LOG_DIR/hot-deploy.log" 100)"
 elif [ "$FRONTEND_ONLY" = true ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend only changes, rebuilding and restarting..." >> "$GIT_LOG"
 
+    wait_for_processing_tasks
+    
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Stopping service to prevent build conflicts..." >> "$GIT_LOG"
+    systemctl --user stop "$SERVICE_NAME" || true
+
     if check_dependencies_changed "$LOCAL_HASH" "$REMOTE_HASH"; then
         npm install >> "$GIT_LOG" 2>&1
     fi
@@ -357,11 +367,12 @@ elif [ "$FRONTEND_ONLY" = true ]; then
 
 $(get_last_logs "$GIT_LOG" 100)"
         notify "$GIT_LOG" "error" "$DEPLOY_MESSAGE" "$COMMIT_TITLE" "$COMMIT_BODY" "$CHANGED_FILES" "$DEPLOY_DETAILS"
+        # 尝试重新启动旧服务以防挂死
+        systemctl --user start "$SERVICE_NAME" || true
         exit 1
     fi
 
-    wait_for_processing_tasks
-    systemctl --user restart "$SERVICE_NAME"
+    systemctl --user start "$SERVICE_NAME"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend rebuilt and restarted successfully" >> "$GIT_LOG"
     DEPLOY_MESSAGE="前端更新完成"
     DEPLOY_DETAILS="前端变更已构建并重启服务"

@@ -81,6 +81,11 @@ health_check() {
         esac
     done
 
+    if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
+        log "$LOG_FILE" "Health repair: Stopping service to prevent build conflicts..."
+        systemctl --user stop "$SERVICE_NAME" || true
+    fi
+
     if [ "$need_rebuild" = true ]; then
         log "$LOG_FILE" "Health repair: Running full rebuild..."
         cd "$APP_DIR"
@@ -108,8 +113,8 @@ health_check() {
     fi
 
     if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
-        log "$LOG_FILE" "Health repair: Restarting service..."
-        systemctl --user restart "$SERVICE_NAME"
+        log "$LOG_FILE" "Health repair: Starting service..."
+        systemctl --user start "$SERVICE_NAME"
     fi
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Health Check End (Repaired) ===" >> "$HEALTH_CHECK_LOG"
@@ -339,6 +344,9 @@ $(get_last_logs "$LOG_FILE" 100)"
 fi
 
 run_prisma_migrate
+
+log "$LOG_FILE" "Stopping service to prevent build conflicts..."
+systemctl --user stop "$SERVICE_NAME" || true
 
 log "$LOG_FILE" "Building..."
 npm run build >> "$LOG_FILE" 2>&1
