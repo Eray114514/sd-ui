@@ -42,6 +42,7 @@ export function TaskList({ initialTasks }: TaskListProps) {
   const [progressDataSnapshot, setProgressDataSnapshot] = useState<Record<string, ProgressData>>({})
   const rafIdRef = useRef<number | null>(null)
   const lastUpdateRef = useRef<number>(0)
+  const isScrolledToBottomRef = useRef(true)
 
   const updateProgressSnapshot = useCallback(() => {
     const now = Date.now()
@@ -62,9 +63,15 @@ export function TaskList({ initialTasks }: TaskListProps) {
   useEffect(() => {
     if (tasks.length > 0) {
       if (initialLoadRef.current) {
-        // 初始加载：立即滚动到底部，没有延迟
-        window.scrollTo(0, document.documentElement.scrollHeight)
+        // 初始加载：立即滚动到底部，并多次重试以应对图片加载带来的高度变化
         initialLoadRef.current = false
+        let attempts = 0
+        const interval = setInterval(() => {
+          window.scrollTo(0, document.documentElement.scrollHeight)
+          attempts++
+          if (attempts >= 10) clearInterval(interval) // 重试 1 秒
+        }, 100)
+        return () => clearInterval(interval)
       } else if (shouldScrollRef.current && bottomRef.current) {
         // 仅在用户手动创建任务时自动下滚，轮询刷新不触发
         bottomRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
@@ -72,6 +79,34 @@ export function TaskList({ initialTasks }: TaskListProps) {
       }
     }
   }, [tasks.length])
+
+  // 监听滚动状态以及高度变化，始终将页面保持在底部（如果已经在底部）
+  useEffect(() => {
+    const handleScroll = () => {
+      const isAtBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 100
+      isScrolledToBottomRef.current = isAtBottom
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll() // 初始化检查一次
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
+    const scrollToBottomIfNeeded = () => {
+      if (isScrolledToBottomRef.current) {
+        window.scrollTo(0, document.documentElement.scrollHeight)
+      }
+    }
+
+    const observer = new ResizeObserver(scrollToBottomIfNeeded)
+    observer.observe(document.documentElement)
+    window.addEventListener('resize', scrollToBottomIfNeeded)
+    
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', scrollToBottomIfNeeded)
+    }
+  }, [])
 
   const handleTasksChange = useCallback(() => {
     getTasks().then(setTasks).catch(console.error)

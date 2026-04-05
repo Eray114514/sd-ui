@@ -5,6 +5,38 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function smoothScrollToBottom() {
+  const start = window.scrollY;
+  let target = document.documentElement.scrollHeight - window.innerHeight;
+  if (start >= target) return;
+
+  const duration = 500;
+  const startTime = performance.now();
+
+  function easeInOutQuad(t: number, b: number, c: number, d: number) {
+    t /= d / 2;
+    if (t < 1) return c / 2 * t * t + b;
+    t--;
+    return -c / 2 * (t * (t - 2) - 1) + b;
+  }
+
+  function animation(currentTime: number) {
+    const elapsed = currentTime - startTime;
+    // Always recalculate target in case document height changed
+    target = document.documentElement.scrollHeight - window.innerHeight;
+    const distance = target - start;
+
+    if (elapsed < duration) {
+      window.scrollTo(0, easeInOutQuad(elapsed, start, distance, duration));
+      requestAnimationFrame(animation);
+    } else {
+      window.scrollTo(0, target);
+    }
+  }
+
+  requestAnimationFrame(animation);
+}
+
 export async function copyToClipboard(text: string): Promise<boolean> {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     try {

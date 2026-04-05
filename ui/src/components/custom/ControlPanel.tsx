@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { useGenerationStore } from "@/store/generationStore"
-import { cn } from "@/lib/utils"
+import { cn, smoothScrollToBottom } from "@/lib/utils"
 import { getModels } from "@/services/modelsService"
 import { getStyles } from "@/services/stylesService"
 import { generate } from "@/services/generateService"
@@ -56,6 +56,8 @@ export function ControlPanel() {
   const [isExpanded, setIsExpanded] = useState(true)
   const lastScrollYRef = useRef(0)
   const scrollThrottleRef = useRef(false)
+  const isResizingRef = useRef(false)
+  const lastInnerHeightRef = useRef(typeof window !== 'undefined' ? window.innerHeight : 0)
   const [textareaHeight, setTextareaHeight] = useState(80)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -69,9 +71,18 @@ export function ControlPanel() {
   useEffect(() => {
     const SCROLL_THRESHOLD = 30 // 最少滚动 30px 才触发折叠/展开变化
     const THROTTLE_MS = 100
+    let resizeTimer: ReturnType<typeof setTimeout>
+
+    const handleResize = () => {
+      lastInnerHeightRef.current = window.innerHeight
+      // 窗口大小改变时，临时忽略滚动事件
+      isResizingRef.current = true
+      clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(() => { isResizingRef.current = false }, 300)
+    }
 
     const handleScroll = () => {
-      if (scrollThrottleRef.current) return
+      if (scrollThrottleRef.current || isResizingRef.current) return
       scrollThrottleRef.current = true
       setTimeout(() => { scrollThrottleRef.current = false }, THROTTLE_MS)
 
@@ -107,7 +118,12 @@ export function ControlPanel() {
     }
 
     window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
+    window.addEventListener("resize", handleResize)
+    return () => {
+      window.removeEventListener("scroll", handleScroll)
+      window.removeEventListener("resize", handleResize)
+      clearTimeout(resizeTimer)
+    }
   }, [])
 
   const selectedRatio = `${width}:${height}`
@@ -221,7 +237,10 @@ export function ControlPanel() {
               <Button
                 variant="secondary"
                 className="rounded-full shadow-md h-7 px-3 text-[11px] font-medium bg-background border border-border text-muted-foreground hover:text-foreground transition-all hover:scale-105 flex items-center gap-1 pointer-events-auto"
-                onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
+                onClick={() => {
+                  setIsExpanded(true)
+                  setTimeout(smoothScrollToBottom, 50)
+                }}
               >
                 回到底部
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7 6 5 5 5-5"/><path d="m7 13 5 5 5-5"/></svg>
