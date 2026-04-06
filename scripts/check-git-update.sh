@@ -105,6 +105,7 @@ health_check() {
     if [ "$need_migrate" = true ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Running prisma migrate deploy..." >> "$GIT_LOG"
         cd "$APP_DIR"
+        node scripts/auto-resolve-prisma.mjs >> "$HEALTH_CHECK_LOG" 2>&1 || true
         npx prisma migrate deploy >> "$HEALTH_CHECK_LOG" 2>&1 || true
         cd "$REPO_DIR"
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Migration complete" >> "$GIT_LOG"
@@ -350,6 +351,8 @@ elif [ "$FRONTEND_ONLY" = true ]; then
     systemctl --user stop "$SERVICE_NAME" || true
 
     if check_dependencies_changed "$LOCAL_HASH" "$REMOTE_HASH"; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dependencies changed, cleaning .next cache and running npm install..." >> "$GIT_LOG"
+        rm -rf "$APP_DIR/.next"
         npm install >> "$GIT_LOG" 2>&1
     fi
     npx prisma generate >> "$GIT_LOG" 2>&1
