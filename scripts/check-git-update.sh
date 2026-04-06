@@ -350,6 +350,8 @@ elif [ "$FRONTEND_ONLY" = true ]; then
     systemctl --user stop "$SERVICE_NAME" || true
 
     if check_dependencies_changed "$LOCAL_HASH" "$REMOTE_HASH"; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dependencies changed, cleaning .next cache and running npm install..." >> "$GIT_LOG"
+        rm -rf "$APP_DIR/.next"
         npm install >> "$GIT_LOG" 2>&1
     fi
     npx prisma generate >> "$GIT_LOG" 2>&1

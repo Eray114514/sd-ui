@@ -355,13 +355,14 @@ build_exit_code=$?
 if [ $build_exit_code -ne 0 ]; then
     log "$LOG_FILE" "WARNING: Build exited with code $build_exit_code"
 
+    log "$LOG_FILE" "Build error detected, cleaning .next cache and node_modules, then retrying..."
+    rm -rf "$APP_DIR/.next"
     if grep -q "Module not found" "$LOG_FILE"; then
-        log "$LOG_FILE" "Module not found error detected, cleaning node_modules and retrying..."
         rm -rf "$APP_DIR/node_modules"
         npm install >> "$LOG_FILE" 2>&1
-        npm run build >> "$LOG_FILE" 2>&1
-        build_exit_code=$?
     fi
+    npm run build >> "$LOG_FILE" 2>&1
+    build_exit_code=$?
 
     if [ $build_exit_code -ne 0 ]; then
         DEPLOY_RESULT="error"
