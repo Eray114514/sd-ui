@@ -325,6 +325,7 @@ if [ "$SCRIPTS_CHANGED" = true ] && [ "$BACKEND_CHANGED" = false ] && [ "$FRONTE
 elif [ "$BACKEND_CHANGED" = true ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backend/API changes detected, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
+        export PREVIOUS_COMMIT="$LOCAL_HASH"
         export COMMIT_TITLE COMMIT_BODY CHANGED_FILES
         "$SCRIPT_DIR/hot-deploy.sh" && DEPLOY_EXIT=0 || DEPLOY_EXIT=$?
         if [ $DEPLOY_EXIT -ne 0 ]; then
@@ -379,6 +380,7 @@ $(get_last_logs "$GIT_LOG" 100)"
 else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generic update, performing hot deployment..." >> "$GIT_LOG"
     if [ -x "$SCRIPT_DIR/hot-deploy.sh" ]; then
+        export PREVIOUS_COMMIT="$LOCAL_HASH"
         export COMMIT_TITLE COMMIT_BODY CHANGED_FILES
         "$SCRIPT_DIR/hot-deploy.sh" && DEPLOY_EXIT=0 || DEPLOY_EXIT=$?
         if [ $DEPLOY_EXIT -ne 0 ]; then

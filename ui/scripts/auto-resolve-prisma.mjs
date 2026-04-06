@@ -1,65 +1,35 @@
-import { createClient } from '@libsql/client';
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
-
-const dbPath = process.env.DATABASE_URL
-  ? process.env.DATABASE_URL.replace(/^file:/, '')
-  : path.join(__dirname, '..', 'prisma', 'dev.db');
-
-const databaseUrl = `file:${dbPath}`;
-
-async function main() {
-  const client = createClient({
-    url: databaseUrl,
-  });
-
+function main() {
+  const cwd = path.join(__dirname, '..');
+  
   try {
-    const taskTableResult = await client.execute(`
-      SELECT name FROM sqlite_master WHERE type='table' AND name='Task';
-    `);
-    const taskExists = taskTableResult.rows.length > 0;
-
-    if (!taskExists) {
-      console.log('[Auto-Resolve] Task table does not exist. Skipping 0_init resolve.');
-      return;
-    }
-
-    const migrationsTableResult = await client.execute(`
-      SELECT name FROM sqlite_master WHERE type='table' AND name='_prisma_migrations';
-    `);
-    const migrationsTableExists = migrationsTableResult.rows.length > 0;
-
-    let initApplied = false;
-
-    if (migrationsTableExists) {
-      const initResult = await client.execute(`
-        SELECT migration_name FROM _prisma_migrations WHERE migration_name='0_init';
-      `);
-      initApplied = initResult.rows.length > 0;
-    }
-
-    if (!initApplied) {
-      console.log('[Auto-Resolve] Existing database detected but 0_init not applied. Resolving...');
-      execSync('npx prisma migrate resolve --applied 0_init', {
-        stdio: 'inherit',
-        cwd: path.join(__dirname, '..')
-      });
-      console.log('[Auto-Resolve] Successfully marked 0_init as applied.');
-    } else {
-      console.log('[Auto-Resolve] 0_init already applied. No action needed.');
-    }
+    // 尝试直接跑 deploy，如果数据库为空或者 0_init 未冲突，它会成功
+    // 如果 0_init 已经应用，它也会直接成功
+    execSync('npx prisma migrate deploy', { stdio: 'pipe', cwd });
+    console.log('[Auto-Resolve] Migrate deploy succeeded. No need to resolve.');
   } catch (error) {
-    console.error('[Auto-Resolve] Error checking/resolving migrations:', error);
-    process.exit(1);
-  } finally {
-    client.close();
+    const output = error.stdout?.toString() + error.stderr?.toString();
+    console.log('[Auto-Resolve] Migrate deploy failed. Output:', output);
+    
+    // 如果是因为数据库不为空（表已存在）导致的冲突 (P3005)，则强制标记 0_init 为已应用
+    if (output && (output.includes('P3005') || output.includes('already exists'))) {
+      console.log('[Auto-Resolve] Database not empty, resolving 0_init...');
+      try {
+        execSync('npx prisma migrate resolve --applied 0_init', { stdio: 'inherit', cwd });
+        console.log('[Auto-Resolve] Successfully marked 0_init as applied.');
+      } catch (resolveError) {
+        console.error('[Auto-Resolve] Error resolving 0_init:', resolveError.message);
+      }
+    } else {
+      console.error('[Auto-Resolve] Unknown migration error. Exiting.');
+      process.exit(1);
+    }
   }
 }
 

@@ -203,7 +203,7 @@ chmod +x scripts/start_sd_ui_ubuntu.sh
 
 1. **克隆项目**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Eray114514/sd-ui.git
    cd sd-ui/ui
    ```
 
@@ -462,7 +462,3 @@ npm run lint
 - [Tailwind CSS](https://tailwindcss.com/) - CSS 框架
 - [Zustand](https://github.com/pmndrs/zustand) - 状态管理
 - [Base UI](https://base-ui.com/) - React UI 组件库
-
----
-
-<p align="center">Made with ❤️ for AI Art enthusiasts</p>

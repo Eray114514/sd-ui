@@ -15,7 +15,8 @@ acquire_lock "hot-deploy"
 rotate_logs "$LOG_DIR"
 
 START_TIME=$(date +%s)
-PREVIOUS_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+# Allow PREVIOUS_COMMIT to be passed from check-git-update.sh
+PREVIOUS_COMMIT="${PREVIOUS_COMMIT:-$(git rev-parse HEAD 2>/dev/null || echo "")}"
 
 load_env_file
 
