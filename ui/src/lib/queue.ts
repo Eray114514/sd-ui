@@ -6,6 +6,8 @@ import { getDefaultImageDir, normalizeImageDir } from "./paths"
 import { SD_WEBUI_BASE_URL } from './sdConfig'
 import { SDApiError } from '@/errors'
 import { createLogger } from './logger'
+import { safeJsonParse } from './utils'
+import { getHttpErrorMessage, getNetworkErrorMessage } from '@/errors/errorHandler'
 import http from 'http'
 import https from 'https'
 
@@ -88,12 +90,7 @@ export async function processQueue() {
 
             try {
                 const config = await prisma.systemConfig.findUnique({ where: { id: 'default' } })
-                let activeLoras = []
-                try {
-                    activeLoras = JSON.parse(config?.activeLoras || "[]")
-                } catch {
-                    activeLoras = []
-                }
+                const activeLoras = safeJsonParse<string[]>(config?.activeLoras, [])
                 
                 const loraString = activeLoras.length > 0 ? " " + activeLoras.join(", ") : ""
                 const finalPrompt = task.prompt + loraString
@@ -101,7 +98,7 @@ export async function processQueue() {
                 const payload = {
                     prompt: finalPrompt,
                     negative_prompt: task.negative_prompt || "",
-                    styles: JSON.parse(task.styles),
+                    styles: safeJsonParse<string[]>(task.styles, []),
                     sampler_name: task.sampler_name,
                     scheduler: task.scheduler,
                     steps: task.steps,
@@ -131,7 +128,7 @@ export async function processQueue() {
 
                 const images = response.data.images;
                 if (!images || images.length === 0) {
-                    throw new SDApiError("No images returned from API", undefined, 'NO_IMAGES');
+                    throw new SDApiError("No images returned from API", 500, 'NO_IMAGES');
                 }
 
                 logger.debug({ taskId: task.id, imageCount: images.length }, 'Received images')
@@ -198,16 +195,10 @@ export async function processQueue() {
 
                 let errorMessage = axiosError.message || "Unknown error"
 
-                if (status === 502) {
-                    errorMessage = "SD WebUI 服务暂时不可用 (502)。可能原因：1) SD WebUI正在生成其他图片 2) 服务重启中 3) 网络连接中断。请稍后重试。"
-                } else if (status === 503) {
-                    errorMessage = "SD WebUI 服务繁忙 (503)，请稍后重试。"
-                } else if (axiosError.code === 'ECONNREFUSED') {
-                    errorMessage = "无法连接到 SD WebUI 服务，请检查服务是否已启动。"
-                } else if (axiosError.code === 'ETIMEDOUT' || axiosError.code === 'ECONNABORTED') {
-                    errorMessage = "连接 SD WebUI 超时，可能是生成时间过长或服务无响应。"
-                } else if (axiosError.code === 'ECONNRESET') {
-                    errorMessage = "连接被重置，可能是 SD WebUI 服务重启或网络不稳定。"
+                if (status) {
+                    errorMessage = getHttpErrorMessage(status, errorMessage)
+                } else if (axiosError.code) {
+                    errorMessage = getNetworkErrorMessage(axiosError.code) || errorMessage
                 }
 
                 const detailedError = {

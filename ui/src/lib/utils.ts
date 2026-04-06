@@ -5,6 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function safeJsonParse<T>(jsonString: string | null | undefined, fallback: T): T {
+  if (!jsonString) return fallback;
+  try {
+    return JSON.parse(jsonString) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 export function smoothScrollToBottom() {
   const start = window.scrollY;
   let target = document.documentElement.scrollHeight - window.innerHeight;
