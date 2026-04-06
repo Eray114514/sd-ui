@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -23,20 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.addEventListener('error', function(event) {
-                if (event.message && (event.message.includes('Loading chunk') || event.message.includes('ChunkLoadError'))) {
-                  console.warn('ChunkLoadError detected, reloading page...');
-                  window.location.reload();
-                }
-              });
-            `,
-          }}
-        />
-      </head>
+      <head />
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <div className="flex min-h-screen bg-background text-foreground pl-sidebar">
@@ -48,6 +36,16 @@ export default function RootLayout({
           <MobileNav />
           <Toaster position="top-center" />
         </ThemeProvider>
+        <Script id="chunk-error-handler" strategy="beforeInteractive">
+          {`
+            window.addEventListener('error', function(event) {
+              if (event.message && (event.message.includes('Loading chunk') || event.message.includes('ChunkLoadError'))) {
+                console.warn('ChunkLoadError detected, reloading page...');
+                window.location.reload();
+              }
+            });
+          `}
+        </Script>
       </body>
     </html>
   );

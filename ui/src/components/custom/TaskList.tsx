@@ -17,22 +17,21 @@ interface TaskListProps {
 const LOCAL_STORAGE_KEY = 'tasks_cache'
 
 export function TaskList({ initialTasks }: TaskListProps) {
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const storedData = localStorage.getItem(LOCAL_STORAGE_KEY)
-        if (storedData) {
-          const { tasks, timestamp } = JSON.parse(storedData)
-          if (Date.now() - timestamp < 5 * 60 * 1000) {
-            return tasks
-          }
+  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  
+  useEffect(() => {
+    try {
+      const storedData = localStorage.getItem(LOCAL_STORAGE_KEY)
+      if (storedData) {
+        const { tasks, timestamp } = JSON.parse(storedData)
+        if (Date.now() - timestamp < 5 * 60 * 1000) {
+          setTasks(tasks)
         }
-      } catch (error) {
-        console.error('Error reading from localStorage:', error)
       }
+    } catch (error) {
+      console.error('Error reading from localStorage:', error)
     }
-    return initialTasks
-  })
+  }, [])
   const bottomSpacerHeight = useGenerationStore(state => state.bottomSpacerHeight)
   const [selectedImage, setSelectedImage] = useState<ImageWithTask | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
