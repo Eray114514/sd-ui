@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -10,13 +11,10 @@ const dbPath = process.env.DATABASE_URL
   ? process.env.DATABASE_URL.replace(/^file:/, '')
   : path.join(__dirname, '..', 'prisma', 'dev.db');
 
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: `file:${dbPath}`
-    }
-  }
-});
+process.env.DATABASE_URL = `file:${dbPath}`;
+
+const adapter = new PrismaLibSql({ url: `file:${dbPath}` });
+const prisma = new PrismaClient({ adapter });
 
 async function scanAndImportImages() {
   console.log('=== 开始扫描图片目录 ===\n');
