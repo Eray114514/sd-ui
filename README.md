@@ -1,12 +1,12 @@
 # SD-UI - Stable Diffusion Web 界面
 
-一个基于 Next.js 15 构建的现代化 Stable Diffusion Web UI，提供直观的图像生成任务管理和参数配置功能。
+一个基于 Next.js 16 构建的现代化 Stable Diffusion Web UI，提供直观的图像生成任务管理和参数配置功能。
 
-![Next.js](https://img.shields.io/badge/Next.js-15.5-black?style=flat-square&logo=next.js)
+![Next.js](https://img.shields.io/badge/Next.js-16.2-black?style=flat-square&logo=next.js)
 ![React](https://img.shields.io/badge/React-19.2-blue?style=flat-square&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-4-38B2AC?style=flat-square&logo=tailwind-css)
-![Prisma](https://img.shields.io/badge/Prisma-6.0-2D3748?style=flat-square&logo=prisma)
+![Prisma](https://img.shields.io/badge/Prisma-7.6-2D3748?style=flat-square&logo=prisma)
 ![Vitest](https://img.shields.io/badge/Vitest-4.1-729B1B?style=flat-square&logo=vitest)
 
 ## ✨ 功能特性
@@ -14,7 +14,8 @@
 ### 🎨 图像生成
 - **提示词编辑**：支持正向提示词和反向提示词输入，支持 Enter 快捷发送
 - **风格预设**：多种风格标签管理，可快速应用常用风格组合
-- **模型选择**：自动获取并管理可用的 Stable Diffusion 模型
+- **模型管理**：自动获取并管理可用的 Stable Diffusion 模型
+- **LoRA 支持**：支持 LoRA 模型的添加、删除和激活管理
 - **参数配置**：
   - 画幅比例选择（1:1、3:4、4:3、9:16、16:9）
   - 迭代步数（10-50）
@@ -42,18 +43,18 @@
 ### ⚙️ 系统设置
 - **独立设置页面**：清晰的设置界面布局
 - **目录配置**：设置图片输出目录（支持可视化目录选择器）
-- **模型管理**：添加、删除和查看可用模型
+- **模型管理**：添加、删除和查看可用模型，以及 LoRA 模型管理
 - **风格管理**：自定义和管理风格预设
 
 ## 🛠️ 技术栈
 
 | 类别 | 技术 |
 |------|------|
-| **前端框架** | Next.js 15.5 + React 19.2 |
+| **前端框架** | Next.js 16.2 + React 19.2 |
 | **开发语言** | TypeScript 5 |
 | **样式方案** | Tailwind CSS 4 + shadcn/ui + @base-ui/react |
 | **状态管理** | Zustand 5（持久化存储） |
-| **数据库** | SQLite + Prisma ORM 6 |
+| **数据库** | libSQL + Prisma ORM 7.6 |
 | **HTTP 客户端** | Axios |
 | **数据校验** | Zod |
 | **测试框架** | Vitest + React Testing Library |
@@ -112,6 +113,7 @@ sd-ui/
         │   │   ├── fs/        # 文件系统操作
         │   │   ├── generate/  # 图像生成接口
         │   │   ├── image/     # 图片管理接口
+        │   │   ├── loras/     # LoRA 管理接口
         │   │   ├── models/    # 模型管理接口
         │   │   ├── progress/  # 进度查询接口
         │   │   ├── settings/  # 系统设置接口
@@ -175,7 +177,7 @@ sd-ui/
 
 ### 环境要求
 
-- Node.js 18.0 或更高版本
+- Node.js 20.0 或更高版本
 - npm 或 yarn 包管理器
 - Stable Diffusion WebUI（需正常运行并启用 --api 参数）
 
@@ -264,6 +266,11 @@ npm start
 ### SystemConfig（系统配置）
 - 存储系统级配置
 - 图片输出目录设置
+- 激活的 LoRA 模型列表 (activeLoras)
+
+### Lora（LoRA 模型）
+- 管理可用的 LoRA 模型
+- 模型名称唯一约束
 
 ## 🔌 API 接口
 
@@ -296,6 +303,13 @@ npm start
 | GET | /api/models | 获取模型列表 |
 | POST | /api/models | 添加模型 |
 | DELETE | /api/models/:id | 删除模型 |
+
+### LoRA 管理
+| 方法 | 路径 | 描述 |
+|------|------|------|
+| GET | /api/loras | 获取 LoRA 列表 |
+| POST | /api/loras | 添加 LoRA |
+| DELETE | /api/loras/:id | 删除 LoRA |
 
 ### 风格管理
 | 方法 | 路径 | 描述 |
@@ -439,7 +453,7 @@ npm run lint
 1. **SD WebUI 连接**：确保 Stable Diffusion WebUI 已启动并添加 `--api` 参数
 2. **图片存储**：默认图片保存目录可在设置页面配置
 3. **数据库**：使用 SQLite 便于部署，生产环境可考虑 PostgreSQL
-4. **缓存策略**：模型和风格列表有 5 分钟缓存，修改后需等待缓存过期或重启
+4. **缓存策略**：模型、LoRA 和风格列表有 5 分钟缓存，修改后需等待缓存过期或重启
 5. **网络配置**：SD WebUI 地址在 `.env` 文件中配置
 
 ## 🤝 贡献指南
