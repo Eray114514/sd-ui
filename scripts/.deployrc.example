@@ -13,3 +13,9 @@ SHUTDOWN_TIMEOUT=30
 PORT=3001
 SERVICE_NAME="sd-ui"
 GIT_BRANCH="main"
+
+# 邮件通知配置 (Email Notification Config)
+# 留空以禁用通知 (Leave empty to disable notifications)
+RESEND_API_KEY=""
+EMAIL_FROM=""
+EMAIL_TO=""

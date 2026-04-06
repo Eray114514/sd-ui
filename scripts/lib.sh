@@ -27,6 +27,11 @@ load_config() {
     PORT="${PORT:-3001}"
     SERVICE_NAME="${SERVICE_NAME:-sd-ui}"
     GIT_BRANCH="${GIT_BRANCH:-main}"
+    
+    # 导出邮箱环境变量供 send_email.py 使用
+    export RESEND_API_KEY="${RESEND_API_KEY:-}"
+    export EMAIL_FROM="${EMAIL_FROM:-}"
+    export EMAIL_TO="${EMAIL_TO:-}"
 
     mkdir -p "$LOG_DIR" "$BACKUP_DIR" "$STATE_DIR"
 }
@@ -163,15 +168,8 @@ validate_env() {
     if [ -z "${DATABASE_URL:-}" ]; then
         missing+=("DATABASE_URL")
     fi
-    if [ -z "${RESEND_API_KEY:-}" ]; then
-        missing+=("RESEND_API_KEY")
-    fi
-    if [ -z "${EMAIL_FROM:-}" ]; then
-        missing+=("EMAIL_FROM")
-    fi
-    if [ -z "${EMAIL_TO:-}" ]; then
-        missing+=("EMAIL_TO")
-    fi
+    # 注意：此处移除了对 RESEND_API_KEY 等邮件配置的强制检查
+    # 因为用户可以留空这些配置以禁用邮件通知
 
     if [ ${#missing[@]} -gt 0 ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Missing required env vars: ${missing[*]}" >&2
@@ -217,6 +215,7 @@ log_output() {
 }
 
 load_env_file() {
+    # ui/.env 仍然被用于读取 DATABASE_URL 等其他配置
     if [ -f "$APP_DIR/.env" ]; then
         set -a
         source "$APP_DIR/.env"

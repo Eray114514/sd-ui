@@ -379,18 +379,20 @@ HTML 邮件包含：
 - 操作消息
 - 详细日志（可选）
 
+# SD-UI 热部署系统文档
+## 邮件通知系统
 ### 邮件配置
 
-**重要**：请在 Linux 服务器上创建 `ui/.env` 文件，脚本会自动加载：
+**重要**：请在 Linux 服务器上的 `scripts/.deployrc` 文件中配置，脚本会自动加载：
 
 ```bash
-# 创建 /home/<USER>/projects/sd-ui/ui/.env
+# 修改 /home/<USER>/projects/sd-ui/scripts/.deployrc
 RESEND_API_KEY="<YOUR_RESEND_API_KEY>"      # Resend API Key
 EMAIL_FROM="<YOUR_EMAIL_FROM>"              # 发件邮箱
-EMAIL_TO="<YOUR_EMAIL_TO>"                    # 收件邮箱
+EMAIL_TO="<YOUR_EMAIL_TO>"                  # 收件邮箱
 ```
 
-脚本启动时会自动 source 此文件加载环境变量。
+脚本启动时会自动 source 此文件加载环境变量。留空这三个变量将会禁用邮件通知。
 
 ### 防邮件轰炸机制
 
