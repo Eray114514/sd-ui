@@ -200,8 +200,13 @@ check_service_health() {
 }
 
 log() {
-    local log_file="$1"
-    shift
+    local log_file
+    if [ $# -ge 2 ]; then
+        log_file="$1"
+        shift
+    else
+        log_file="${LOG_FILE:-${GIT_LOG:-/dev/stdout}}"
+    fi
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$log_file"
 }
 
