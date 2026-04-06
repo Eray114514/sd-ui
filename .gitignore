@@ -9,8 +9,12 @@ node_modules/
 logs/
 *.log
 
+# Python Cache
+__pycache__/
+*.pyc
+
 # Deploy config (local overrides)
-.deployrc
+scripts/.deployrc
 
 # Database backups
 ui/prisma/backups/

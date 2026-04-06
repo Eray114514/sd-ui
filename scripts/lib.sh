@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="$REPO_DIR/ui"
 
-CONFIG_FILE="$REPO_DIR/.deployrc"
+CONFIG_FILE="$SCRIPT_DIR/.deployrc"
 DEFAULT_CONFIG="$SCRIPT_DIR/.deployrc.example"
 
 load_config() {
