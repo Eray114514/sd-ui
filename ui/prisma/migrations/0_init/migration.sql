@@ -1,7 +1,7 @@
 -- CreateTable
 CREATE TABLE "Task" (
     "id" TEXT NOT NULL PRIMARY KEY,
-    "prompt" TEXT NOT NULL,
+    "prompt" TEXT NULL,
     "negative_prompt" TEXT,
     "styles" TEXT NOT NULL,
     "sampler_name" TEXT NOT NULL,
@@ -81,3 +81,4 @@ CREATE UNIQUE INDEX "Style_name_key" ON "Style"("name");
 -- CreateIndex
 CREATE UNIQUE INDEX "Lora_name_key" ON "Lora"("name");
 
+-- Modified
