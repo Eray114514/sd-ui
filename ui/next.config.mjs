@@ -2,7 +2,7 @@ import path from "path";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: [],
+  serverExternalPackages: ['@prisma/client', 'prisma'],
   devIndicators: false,
 };
 

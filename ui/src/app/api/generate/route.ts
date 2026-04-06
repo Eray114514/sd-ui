@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic"
 import { prisma } from '@/lib/db'
 import { processQueue } from '@/lib/queue'
 import { createTaskSchema } from '@/lib/validations'
