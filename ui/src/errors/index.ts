@@ -1,22 +1,40 @@
 import { ZodError } from 'zod'
 
-export class BusinessError extends Error {
+/**
+ * 基础应用错误类
+ */
+export class AppError extends Error {
+  constructor(message: string, public code: string, public status: number = 500, public details?: unknown) {
+    super(message)
+    this.name = 'AppError'
+  }
+}
+
+/**
+ * 业务逻辑错误 (400 Bad Request)
+ * 场景：任务状态不正确、权限不足、配置缺失等业务规则校验失败
+ */
+export class BusinessError extends AppError {
   constructor(
     message: string,
-    public code: string = 'BUSINESS_ERROR',
-    public details?: unknown
+    code: string = 'BUSINESS_ERROR',
+    details?: unknown
   ) {
-    super(message)
+    super(message, code, 400, details)
     this.name = 'BusinessError'
   }
 }
 
-export class ValidationError extends Error {
+/**
+ * 验证错误 (400 Bad Request)
+ * 场景：API请求参数格式不正确，通常由 Zod 抛出
+ */
+export class ValidationError extends AppError {
   constructor(
     message: string,
     public issues: Array<{ path: string; message: string }>
   ) {
-    super(message)
+    super(message, 'VALIDATION_ERROR', 400, { issues })
     this.name = 'ValidationError'
   }
 
@@ -29,14 +47,18 @@ export class ValidationError extends Error {
   }
 }
 
-export class ApiError extends Error {
+/**
+ * 通用 API 错误
+ * 场景：通用的 HTTP 请求错误（如 404 Not Found, 401 Unauthorized, 500 Internal Server Error）
+ */
+export class ApiError extends AppError {
   constructor(
     message: string,
-    public code: string,
-    public status: number = 500,
-    public details?: unknown
+    code: string,
+    status: number = 500,
+    details?: unknown
   ) {
-    super(message)
+    super(message, code, status, details)
     this.name = 'ApiError'
   }
 
@@ -65,14 +87,18 @@ export class ApiError extends Error {
   }
 }
 
-export class SDApiError extends Error {
+/**
+ * SD WebUI 专用错误
+ * 场景：与下游 SD WebUI 服务通信时发生的错误（超时、502、生成失败等）
+ */
+export class SDApiError extends AppError {
   constructor(
     message: string,
-    public statusCode?: number,
-    public errorCode?: string,
+    public statusCode: number = 500,
+    errorCode: string = 'SD_API_ERROR',
     public responseData?: unknown
   ) {
-    super(message)
+    super(message, errorCode, statusCode, responseData)
     this.name = 'SDApiError'
   }
 }
@@ -100,6 +126,9 @@ export function toApiError(error: unknown): ApiError {
   }
   if (error instanceof BusinessError) {
     return new ApiError(error.message, error.code, 400, error.details)
+  }
+  if (error instanceof AppError) {
+    return new ApiError(error.message, error.code, error.status, error.details)
   }
   if (error instanceof Error) {
     return new ApiError(error.message, 'UNKNOWN_ERROR', 500)

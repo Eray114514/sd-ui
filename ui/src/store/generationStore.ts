@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Task } from '@/types'
 import type { GenerationParams } from '@/types/generation'
 import { GENERATION_DEFAULTS } from '@/constants'
+import { safeJsonParse } from '@/lib/utils'
 
 export interface GenerationState extends GenerationParams {
   prompt: string
@@ -57,12 +58,7 @@ export const useGenerationStore = create<GenerationState>()(
       setBottomSpacerHeight: (bottomSpacerHeight: number) => set({ bottomSpacerHeight }),
 
       fillFromTask: (task: Task) => {
-        let styles: string[] = []
-        try {
-          styles = JSON.parse(task.styles || "[]")
-        } catch {
-          styles = []
-        }
+        const styles = safeJsonParse<string[]>(task.styles, [])
 
         set({
           prompt: task.prompt || "",
