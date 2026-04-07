@@ -143,7 +143,7 @@
 
   @media (max-width: 768px) {
     .pl-sidebar {
-      @apply pl-0 pt-16;
+      @apply pl-0 pt-[calc(3.5rem+env(safe-area-inset-top))];
     }
   }
 }
