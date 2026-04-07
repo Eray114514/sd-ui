@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic"
 import { prisma } from '@/lib/db'
 import { processQueue } from '@/lib/queue'
+import { eventTracker } from '@/lib/eventTracker'
 import { createTaskSchema } from '@/lib/validations'
 import { successResponse, handleApiError } from '@/lib/api-response'
 import { createLogger } from '@/lib/logger'
@@ -33,6 +34,8 @@ export async function POST(req: Request) {
         })
 
         logger.info({ taskId: task.id }, 'Task created successfully')
+
+        eventTracker.notifyTasksChanged()
 
         processQueue().catch((err) => {
             logger.error({ err }, 'Queue processing error')

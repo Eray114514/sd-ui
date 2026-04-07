@@ -3,9 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react"
 import { useGenerationStore } from "@/store/generationStore"
 import { getTasks, clearTasksCache } from "@/services/tasksService"
-import { getProgress } from "@/services/progressService"
 import { UI_CONSTANTS } from "@/constants"
-import { tasksPollingManager, progressPollingManager } from "@/lib/pollingManager"
 import type { Task, ProgressData, ImageWithTask } from "@/types"
 import { TaskCard } from "@/components/custom/TaskCard"
 import { ImageDetailModal } from "@/components/custom/ImageDetailModal"
@@ -134,7 +132,6 @@ export function TaskList({ initialTasks }: TaskListProps) {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        // 轮询时清除缓存，确保获取最新数据
         clearTasksCache()
         const data = await getTasks()
         setTasks(data)
@@ -143,59 +140,68 @@ export function TaskList({ initialTasks }: TaskListProps) {
       }
     }
 
+    const eventSource = new EventSource('/api/events')
+
+    eventSource.addEventListener('sync', (e) => {
+      console.log('SSE Sync received')
+      fetchTasks()
+    })
+
+    eventSource.addEventListener('tasks_changed', (e) => {
+      fetchTasks()
+    })
+
+    eventSource.addEventListener('progress', (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        if (data) {
+          // data is the raw progress response from SD WebUI
+          setTasks(currentTasks => {
+            const updated: Record<string, ProgressData> = {}
+            const processingTasks = currentTasks.filter((t: Task) => t.status === 'processing')
+            
+            if (processingTasks.length > 0 && data.progress !== undefined) {
+              for (const task of processingTasks) {
+                updated[task.id] = {
+                  progress: data.progress || 0,
+                  current_image: data.current_image || null
+                }
+              }
+              
+              if (Object.keys(updated).length > 0) {
+                Object.assign(progressDataRef.current, updated)
+                scheduleProgressUpdate()
+              }
+            }
+            return currentTasks;
+          })
+        }
+      } catch (err) {
+        console.error('Failed to parse progress event:', err)
+      }
+    })
+
+    eventSource.onerror = (error) => {
+      console.error('SSE Error:', error)
+      // EventSource automatically reconnects, but we don't want to spam logs
+    }
+
     const handleTaskCreated = () => {
-      shouldScrollRef.current = true // 用户创建任务时标记需要自动下滚
+      shouldScrollRef.current = true 
       fetchTasks()
     }
 
-    tasksPollingManager.start(handleTaskCreated)
     window.addEventListener('task-created', handleTaskCreated)
 
     return () => {
-      tasksPollingManager.stop()
+      eventSource.close()
       window.removeEventListener('task-created', handleTaskCreated)
-    }
-  }, [])
-
-  useEffect(() => {
-    const fetchProgress = async () => {
-      const hasProcessing = tasks.some((t: Task) => t.status === 'processing')
-      if (!hasProcessing) {
-        progressPollingManager.stop()
-        return
-      }
-
-      try {
-        const data = await getProgress(false)
-        if (data) {
-          const updated: Record<string, ProgressData> = {}
-          const processingTasks = tasks.filter((t: Task) => t.status === 'processing')
-          for (const task of processingTasks) {
-            updated[task.id] = {
-              progress: data.progress || 0,
-              current_image: data.current_image || null
-            }
-          }
-          if (Object.keys(updated).length > 0) {
-            Object.assign(progressDataRef.current, updated)
-            scheduleProgressUpdate()
-          }
-        }
-      } catch {
-        // ignore errors during polling
-      }
-    }
-
-    progressPollingManager.start(fetchProgress)
-
-    return () => {
-      progressPollingManager.stop()
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current)
         rafIdRef.current = null
       }
     }
-  }, [tasks, scheduleProgressUpdate])
+  }, [scheduleProgressUpdate])
 
   return (
     <>

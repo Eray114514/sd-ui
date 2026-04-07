@@ -5,6 +5,7 @@ import fs from 'fs/promises'
 import { successResponse, handleApiError } from '@/lib/api-response'
 import { createLogger } from '@/lib/logger'
 import { deleteTaskSchema } from '@/lib/validations/tasks'
+import { eventTracker } from '@/lib/eventTracker'
 
 const logger = createLogger('api:tasks')
 
@@ -60,6 +61,8 @@ export async function DELETE(req: Request) {
         await prisma.task.delete({
             where: { id }
         })
+
+        eventTracker.notifyTasksChanged()
 
         logger.info({ taskId: id }, 'Task deleted successfully')
 

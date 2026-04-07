@@ -10,6 +10,7 @@ import { safeJsonParse } from './utils'
 import { getHttpErrorMessage, getNetworkErrorMessage } from '@/errors/errorHandler'
 import http from 'http'
 import https from 'https'
+import { eventTracker } from './eventTracker'
 
 const logger = createLogger('queue')
 
@@ -87,6 +88,8 @@ export async function processQueue() {
                 where: { id: task.id },
                 data: { status: 'processing' },
             })
+            
+            eventTracker.notifyTasksChanged()
 
             try {
                 const config = await prisma.systemConfig.findUnique({ where: { id: 'default' } })
@@ -164,6 +167,8 @@ export async function processQueue() {
                         data: { status: 'completed' },
                     })
                 })
+                
+                eventTracker.notifyTasksChanged()
 
                 logger.info({ taskId: task.id, imageCount: savedPaths.length }, 'Task completed')
 
@@ -190,6 +195,7 @@ export async function processQueue() {
                             retryCount: currentRetry + 1
                         },
                     })
+                    eventTracker.notifyTasksChanged()
                     continue
                 }
 
@@ -232,6 +238,8 @@ export async function processQueue() {
                     where: { id: task.id },
                     data: { status: 'failed', error: errorJson },
                 })
+                
+                eventTracker.notifyTasksChanged()
             }
         }
     } finally {
