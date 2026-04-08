@@ -2,26 +2,26 @@
 
 ## 概述
 
-SD-UI 采用 **任意开发端 → Linux 服务器自动部署** 的工作流。开发端与服务器不在同一域（跨平台、跨网络），通过 GitHub 作为中转。当代码推送到 GitHub 后，Linux 服务器自动检测更新并完成构建、部署、重启，全程无需人工干预。
+SD-UI 采用 **任意开发端 → GitHub Actions → Linux 服务器自动部署** 的零秒延迟工作流。开发端与服务器不在同一域（跨平台、跨网络），通过 GitHub 作为中转。当代码推送到 GitHub 的 `main` 分支后，GitHub Actions (Self-hosted Runner) 瞬间触发 Linux 服务器自动检测更新并完成构建、部署、重启，全程无需人工干预且无公网 IP 要求。
 
 ```
 开发端 (Windows/macOS/Linux)
-       │
+       │ (git push)
        ▼
-   GitHub
-       │
+   GitHub (触发 Actions)
+       │ (长连接零秒下发)
        ▼
-Linux 服务器 (自动检测 + 部署)
+Linux 服务器 (GitHub Runner 服务)
    ┌─────────────────────────────────────┐
-   │  Cron (每分钟)                        │
-   │       │                              │
-   │       ▼                              │
-   │  check-git-update.sh                  │
-   │       │                              │
-   │       ├── 脚本修改? → 仅更新脚本       │
-   │       ├── 前端修改? → 重建+同步        │
-   │       ├── 后端修改? → 完整热部署      │
-   │       └── 文档修改? → 忽略            │
+   │  actions-runner.service (后台进程)  │
+   │       │                             │
+   │       ▼                             │
+   │  check-git-update.sh                │
+   │       │                             │
+   │       ├── 脚本修改? → 仅更新脚本    │
+   │       ├── 前端修改? → 重建+同步     │
+   │       ├── 后端修改? → 完整热部署    │
+   │       └── 文档修改? → 忽略          │
    └─────────────────────────────────────┘
 ```
 
@@ -50,8 +50,8 @@ Linux 服务器 (自动检测 + 部署)
 
 | 脚本                         | 位置       | 功能                                        |
 | ---------------------------- | ---------- | ------------------------------------------- |
-| `check-git-update.sh`        | `scripts/` | Cron 调用，检测更新并触发部署               |
-| `hot-deploy.sh`              | `scripts/` | 完整热部署：备份→安装依赖→构建→重启         |
+| `check-git-update.sh`        | `scripts/` | 被 GitHub Runner 调用，检测更新并触发部署    |
+| `hot-deploy.sh`              | `scripts/` | 完整热部署：等待任务→备份→安装依赖→构建→重启 |
 | `send_email.py`              | `scripts/` | Python 发邮件脚本，通过 Resend API 发送通知 |
 | `nginx-dev.conf`             | `scripts/` | Nginx 反向代理配置（端口 3000→3001）        |
 
@@ -60,7 +60,7 @@ Linux 服务器 (自动检测 + 部署)
 ```
 sd-ui/
 ├── scripts/                    # 部署脚本
-│   ├── check-git-update.sh     # ← Cron 每分钟执行
+│   ├── check-git-update.sh     # ← 由 Actions Runner 触发
 │   ├── hot-deploy.sh           # 完整热部署
 │   ├── nginx-dev.conf
 │   └── enable_autostart_ubuntu.sh
@@ -166,26 +166,20 @@ curl -f http://localhost:3000/
 
 ## 部署步骤
 
-### 1. Linux 服务器初始设置
+### 1. Linux 服务器初始设置与 Runner 安装
 
 ```bash
-# 进入项目目录
-cd ~/projects/sd-ui
-
-# 安装依赖
-cd ui && npm install && cd ..
-
-# 设置数据库
-cd ui
+# 1. 基础依赖与环境初始化
+cd ~/projects/sd-ui/ui
+npm install
 DATABASE_URL="file:./prisma/dev.db" npx prisma db push
+npm run build
 
-# 构建
-cd ui && npm run build
-
-# 配置 Cron（每分钟检测更新）
-crontab -e
-# 添加：
-* * * * * /home/<YOUR_USER>/projects/sd-ui/scripts/check-git-update.sh >> /home/<YOUR_USER>/.local/share/sd-ui/logs/cron.log 2>&1
+# 2. 部署 GitHub Actions Runner
+# 请前往 GitHub 仓库 -> Settings -> Actions -> Runners -> New self-hosted runner
+# 根据官方指引，下载并配置 Runner，然后在 ~/actions-runner 目录下执行：
+sudo ./svc.sh install
+sudo ./svc.sh start
 ```
 
 ### 2. systemd 用户服务
@@ -527,18 +521,9 @@ git commit -m "chore: restore execute permission"
 git push
 ```
 
-### Cron 没有执行
-
-```bash
-# 检查 Crontab
-crontab -l
-
-# 手动测试
-/home/<YOUR_USER>/projects/sd-ui/scripts/check-git-update.sh
-
-# 检查 cron 服务
-systemctl --user status cron
-```
+### Cron / 轮询报错
+注意：我们已完全弃用 Cron 轮询，升级为 GitHub Actions 零秒触发。
+请确保旧的 crontab 条目已被删除，所有部署日志应在 `actions-runner/_diag/` 或 Web 端的 Actions 页面查看。
 
 ### 部署卡住
 
