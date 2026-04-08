@@ -83,8 +83,10 @@ health_check() {
     done
 
     if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
-        log "$LOG_FILE" "Health repair: Stopping service to prevent build conflicts..."
+        log "$LOG_FILE" "Health repair: Stopping service to prevent database locks and build conflicts..."
         systemctl --user stop "$SERVICE_NAME" || true
+        # 添加安全等待逻辑，确保 SQLite 连接完全释放
+        sleep 3
     fi
 
     if [ "$need_rebuild" = true ]; then
@@ -346,10 +348,12 @@ $(get_last_logs "$LOG_FILE" 100)"
     exit 1
 fi
 
-run_prisma_migrate
-
-log "$LOG_FILE" "Stopping service to prevent build conflicts..."
+log "$LOG_FILE" "Stopping service to prevent database locks and build conflicts..."
 systemctl --user stop "$SERVICE_NAME" || true
+# 添加安全等待逻辑，确保 SQLite 连接完全释放
+sleep 3
+
+run_prisma_migrate
 
 log "$LOG_FILE" "Building..."
 npm run build >> "$LOG_FILE" 2>&1

@@ -80,8 +80,10 @@ health_check() {
     done
 
     if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Stopping service to prevent build conflicts..." >> "$GIT_LOG"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Stopping service to prevent database locks and build conflicts..." >> "$GIT_LOG"
         systemctl --user stop "$SERVICE_NAME" || true
+        # 添加安全等待逻辑，确保 SQLite 连接完全释放
+        sleep 3
     fi
 
     if [ "$need_rebuild" = true ]; then
@@ -356,6 +358,9 @@ elif [ "$FRONTEND_ONLY" = true ]; then
         rm -rf "$APP_DIR/.next"
         npm install >> "$GIT_LOG" 2>&1
     fi
+    
+    # 确保停止服务释放数据库锁后再做 Prisma 相关操作
+    sleep 3
     npx prisma generate >> "$GIT_LOG" 2>&1
     npm run build >> "$GIT_LOG" 2>&1
     BUILD_EXIT=$?
