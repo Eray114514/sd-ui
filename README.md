@@ -476,3 +476,4 @@ npm run lint
 - [Tailwind CSS](https://tailwindcss.com/) - CSS 框架
 - [Zustand](https://github.com/pmndrs/zustand) - 状态管理
 - [Base UI](https://base-ui.com/) - React UI 组件库
+\n# Trigger actions
