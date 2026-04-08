@@ -3,27 +3,28 @@ name: Auto Deploy to Local Server
 on:
   push:
     branches:
-      - main # 或你想要监控的分支，如 master
+      - main # 监控 main 分支
 
 jobs:
   deploy:
-    # 这里的 self-hosted 是必须要写的，后面的标签是你配置 runner 时自定义的（默认会有 self-hosted, linux, x64）
     runs-on: [self-hosted, linux]
 
     steps:
       - name: Trigger Local Deployment Script
-        # runner 会在它自己的工作目录执行。我们需要跳转到你的项目目录去执行现有的自动部署脚本
-        # 假设你的脚本都在 /home/<YOUR_USER>/projects/sd-ui/scripts/ 下，这里写绝对路径最保险
-        # $GITHUB_WORKSPACE 也可以用，但你的环境是直接拉取部署的，直接调脚本最直接
         run: |
           echo "Received push event. Triggering deployment script..."
           
-          # 因为你的脚本依赖于一些环境变量（如 XDG_RUNTIME_DIR），我们需要模拟登录用户的环境
-          # 如果 runner 是以你的用户身份运行的，这通常没问题。如果报错，可以加上 su - <YOUR_USER> -c 
+          # 因为 GitHub Runner 默认在 /home/<user>/actions-runner/_work 下执行
+          # 我们需要跳转到你的项目目录去执行现有的部署脚本
+          # 使用环境变量，如果你的项目在普通用户的 ~/projects/sd-ui 下
+          SCRIPT_PATH="$HOME/projects/sd-ui/scripts/check-git-update.sh"
           
-          # 注意：请将下面的路径替换为你服务器上项目的真实绝对路径
-          # 例如：/home/ubuntu/projects/sd-ui/scripts/check-git-update.sh
-          
-          bash /workspace/scripts/check-git-update.sh
+          if [ -f "$SCRIPT_PATH" ]; then
+            echo "Executing $SCRIPT_PATH"
+            bash "$SCRIPT_PATH"
+          else
+            echo "Error: Script not found at $SCRIPT_PATH"
+            exit 1
+          fi
           
           echo "Deployment script triggered successfully."
