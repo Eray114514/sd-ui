@@ -82,8 +82,20 @@ health_check() {
     if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Health repair: Stopping service to prevent database locks and build conflicts..." >> "$GIT_LOG"
         systemctl --user stop "$SERVICE_NAME" || true
-        # 添加安全等待逻辑，确保 SQLite 连接完全释放
-        sleep 3
+        
+        # 安全等待逻辑，确保服务已完全停止且 SQLite 连接释放
+        local retry_count=0
+        while systemctl --user is-active --quiet "$SERVICE_NAME" && [ $retry_count -lt 10 ]; do
+            sleep 1
+            retry_count=$((retry_count + 1))
+        done
+        
+        if systemctl --user is-active --quiet "$SERVICE_NAME"; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Service failed to stop normally, attempting kill..." >> "$GIT_LOG"
+            systemctl --user kill -s SIGKILL "$SERVICE_NAME" || true
+            sleep 2
+        fi
+        sleep 1
     fi
 
     if [ "$need_rebuild" = true ]; then
@@ -214,6 +226,10 @@ if [ -n "$LOCAL_CHANGES" ]; then
             CONFLICTS=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
             if [ -n "$CONFLICTS" ]; then
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected conflicts: $CONFLICTS" >> "$GIT_LOG"
+                # 备份冲突的本地修改到 patch 文件，防止静默丢失
+                git diff > "$LOG_DIR/conflict-$(date +%s).patch" 2>/dev/null || true
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Conflicts backed up to $LOG_DIR/conflict-$(date +%s).patch" >> "$GIT_LOG"
+                
                 git checkout --ours . 2>/dev/null || true
                 git add -A 2>/dev/null || true
             fi
@@ -229,6 +245,10 @@ if [ -n "$LOCAL_CHANGES" ]; then
             CONFLICTS=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
             if [ -n "$CONFLICTS" ]; then
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detected conflicts: $CONFLICTS" >> "$GIT_LOG"
+                # 备份冲突的本地修改到 patch 文件，防止静默丢失
+                git diff > "$LOG_DIR/conflict-$(date +%s).patch" 2>/dev/null || true
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Conflicts backed up to $LOG_DIR/conflict-$(date +%s).patch" >> "$GIT_LOG"
+                
                 git checkout --ours . 2>/dev/null || true
                 git add -A 2>/dev/null || true
             fi
@@ -353,14 +373,26 @@ elif [ "$FRONTEND_ONLY" = true ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Stopping service to prevent build conflicts..." >> "$GIT_LOG"
     systemctl --user stop "$SERVICE_NAME" || true
 
+    # 安全等待逻辑，确保服务已完全停止且 SQLite 连接释放
+    retry_count=0
+    while systemctl --user is-active --quiet "$SERVICE_NAME" && [ $retry_count -lt 10 ]; do
+        sleep 1
+        retry_count=$((retry_count + 1))
+    done
+
+    if systemctl --user is-active --quiet "$SERVICE_NAME"; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Service failed to stop normally, attempting kill..." >> "$GIT_LOG"
+        systemctl --user kill -s SIGKILL "$SERVICE_NAME" || true
+        sleep 2
+    fi
+    sleep 1
+
     if check_dependencies_changed "$LOCAL_HASH" "$REMOTE_HASH"; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dependencies changed, cleaning .next cache and running npm install..." >> "$GIT_LOG"
         rm -rf "$APP_DIR/.next"
         npm install >> "$GIT_LOG" 2>&1
     fi
     
-    # 确保停止服务释放数据库锁后再做 Prisma 相关操作
-    sleep 3
     npx prisma generate >> "$GIT_LOG" 2>&1
     npm run build >> "$GIT_LOG" 2>&1
     BUILD_EXIT=$?

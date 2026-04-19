@@ -9,9 +9,14 @@ export async function GET() {
     return NextResponse.json(cached)
   }
 
-  const loras = await prisma.lora.findMany()
-  apiCache.set('loras', loras)
-  return NextResponse.json(loras)
+  try {
+    const loras = await prisma.lora.findMany()
+    apiCache.set('loras', loras)
+    return NextResponse.json(loras)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
+  }
 }
 
 export async function POST(req: Request) {

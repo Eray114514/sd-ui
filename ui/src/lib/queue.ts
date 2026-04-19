@@ -154,12 +154,12 @@ export async function processQueue() {
                 }
 
                 await prisma.$transaction(async (tx) => {
-                    for (const p of savedPaths) {
-                        await tx.generatedImage.create({
-                            data: {
+                    if (savedPaths.length > 0) {
+                        await tx.generatedImage.createMany({
+                            data: savedPaths.map(p => ({
                                 path: p,
                                 taskId: task.id
-                            }
+                            }))
                         })
                     }
                     await tx.task.update({

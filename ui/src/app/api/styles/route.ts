@@ -14,17 +14,22 @@ export async function GET() {
     return NextResponse.json(cached)
   }
 
-  let styles = await prisma.style.findMany()
+  try {
+    let styles = await prisma.style.findMany()
 
-  if (styles.length === 0) {
-    for (const styleName of DEFAULT_STYLES) {
-      await prisma.style.create({ data: { name: styleName } })
+    if (styles.length === 0) {
+      await prisma.style.createMany({
+        data: DEFAULT_STYLES.map(name => ({ name }))
+      })
+      styles = await prisma.style.findMany()
     }
-    styles = await prisma.style.findMany()
-  }
 
-  apiCache.set(cacheKeys.styles, styles)
-  return NextResponse.json(styles)
+    apiCache.set(cacheKeys.styles, styles)
+    return NextResponse.json(styles)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
+  }
 }
 
 export async function POST(req: Request) {

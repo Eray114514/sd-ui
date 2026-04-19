@@ -17,24 +17,29 @@ export async function GET(req: Request) {
     }
   }
 
-  const images = await prisma.generatedImage.findMany({
-    take: ASSETS_PAGE_SIZE,
-    skip: cursor ? 1 : (page > 0 ? page * ASSETS_PAGE_SIZE : 0),
-    cursor: cursor ? { id: cursor } : undefined,
-    orderBy: [
-      { createdAt: 'desc' },
-      { id: 'desc' }
-    ],
-    include: {
-      task: true
+  try {
+    const images = await prisma.generatedImage.findMany({
+      take: ASSETS_PAGE_SIZE,
+      skip: cursor ? 1 : (page > 0 ? page * ASSETS_PAGE_SIZE : 0),
+      cursor: cursor ? { id: cursor } : undefined,
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'desc' }
+      ],
+      include: {
+        task: true
+      }
+    })
+
+    if (!cursor && page === 0) {
+      apiCache.set(cacheKeys.assets(), images)
     }
-  })
 
-  if (!cursor && page === 0) {
-    apiCache.set(cacheKeys.assets(), images)
+    return NextResponse.json(images)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
-
-  return NextResponse.json(images)
 }
 
 export async function DELETE(req: Request) {

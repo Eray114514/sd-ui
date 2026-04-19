@@ -25,15 +25,26 @@ export async function GET(req: Request) {
     let filePath = originalPath
     let shouldUpdatePath = false
 
-    // 1. Check if original path exists (async)
-    if (!(await fileExists(filePath))) {
-        // 2. If not, try to find file in current configured imageDir
-        try {
-            const config = await prisma.systemConfig.findUnique({ where: { id: 'default' } })
-            
-            const rawDir = config?.imageDir || getDefaultImageDir()
-            const currentDir = normalizeImageDir(rawDir)
-            
+    try {
+        const config = await prisma.systemConfig.findUnique({ where: { id: 'default' } })
+        const rawDir = config?.imageDir || getDefaultImageDir()
+        const currentDir = normalizeImageDir(rawDir)
+
+        const normalizedOriginalPath = path.resolve(originalPath)
+        const isInCurrentDir = normalizedOriginalPath.startsWith(currentDir)
+
+        if (!isInCurrentDir) {
+            const imageInDb = await prisma.generatedImage.findFirst({
+                where: { path: originalPath }
+            })
+            if (!imageInDb) {
+                return new NextResponse('Forbidden', { status: 403 })
+            }
+        }
+
+        // 1. Check if original path exists (async)
+        if (!(await fileExists(filePath))) {
+            // 2. If not, try to find file in current configured imageDir
             const filename = path.basename(originalPath)
             const newPath = path.join(currentDir, filename)
 
@@ -43,10 +54,10 @@ export async function GET(req: Request) {
             } else {
                 return new NextResponse('Image not found', { status: 404 })
             }
-        } catch {
-            console.error("Error resolving image path")
-            return new NextResponse('Internal Server Error', { status: 500 })
         }
+    } catch {
+        console.error("Error resolving image path")
+        return new NextResponse('Internal Server Error', { status: 500 })
     }
 
     // 3. Stream file (async, non-blocking)

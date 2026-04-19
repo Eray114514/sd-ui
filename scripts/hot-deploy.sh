@@ -85,8 +85,20 @@ health_check() {
     if [ "$need_rebuild" = true ] || [ "$need_migrate" = true ] || [ "$need_db_push" = true ]; then
         log "$LOG_FILE" "Health repair: Stopping service to prevent database locks and build conflicts..."
         systemctl --user stop "$SERVICE_NAME" || true
-        # 添加安全等待逻辑，确保 SQLite 连接完全释放
-        sleep 3
+        
+        # 安全等待逻辑，确保服务已完全停止且 SQLite 连接释放
+        local retry_count=0
+        while systemctl --user is-active --quiet "$SERVICE_NAME" && [ $retry_count -lt 10 ]; do
+            sleep 1
+            retry_count=$((retry_count + 1))
+        done
+        
+        if systemctl --user is-active --quiet "$SERVICE_NAME"; then
+            log "$LOG_FILE" "WARNING: Service failed to stop normally, attempting kill..."
+            systemctl --user kill -s SIGKILL "$SERVICE_NAME" || true
+            sleep 2
+        fi
+        sleep 1
     fi
 
     if [ "$need_rebuild" = true ]; then
@@ -350,8 +362,20 @@ fi
 
 log "$LOG_FILE" "Stopping service to prevent database locks and build conflicts..."
 systemctl --user stop "$SERVICE_NAME" || true
-# 添加安全等待逻辑，确保 SQLite 连接完全释放
-sleep 3
+
+# 安全等待逻辑，确保服务已完全停止且 SQLite 连接释放
+retry_count=0
+while systemctl --user is-active --quiet "$SERVICE_NAME" && [ $retry_count -lt 10 ]; do
+    sleep 1
+    retry_count=$((retry_count + 1))
+done
+
+if systemctl --user is-active --quiet "$SERVICE_NAME"; then
+    log "$LOG_FILE" "WARNING: Service failed to stop normally, attempting kill..."
+    systemctl --user kill -s SIGKILL "$SERVICE_NAME" || true
+    sleep 2
+fi
+sleep 1
 
 run_prisma_migrate
 

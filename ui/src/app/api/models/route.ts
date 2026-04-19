@@ -9,9 +9,14 @@ export async function GET() {
     return NextResponse.json(cached)
   }
 
-  const models = await prisma.sdModel.findMany()
-  apiCache.set(cacheKeys.models, models)
-  return NextResponse.json(models)
+  try {
+    const models = await prisma.sdModel.findMany()
+    apiCache.set(cacheKeys.models, models)
+    return NextResponse.json(models)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
+  }
 }
 
 export async function POST(req: Request) {
