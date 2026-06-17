@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { TrashIcon, SaveIcon, PlusIcon, Database, Palette, HardDrive, Settings2 } from "lucide-react"
+import { Loader2, TrashIcon, SaveIcon, PlusIcon, Database, Palette, HardDrive, Settings2 } from "lucide-react"
 import axios from "axios"
 import { toast } from "sonner"
 import { DirectoryPicker } from "@/components/custom/DirectoryPicker"
@@ -70,9 +70,9 @@ export default function SettingsPage() {
 
     const saveSettings = async () => {
         try {
-            await axios.post('/api/settings', { 
-                imageDir, 
-                activeLoras: JSON.stringify(activeLoras) 
+            await axios.post('/api/settings', {
+                imageDir,
+                activeLoras: JSON.stringify(activeLoras)
             })
             toast.success("设置已保存")
         } catch {
@@ -168,7 +168,7 @@ export default function SettingsPage() {
     if (isLoading) {
         return (
             <div className="min-h-screen bg-background p-6 md:p-8 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
         )
     }
@@ -177,7 +177,7 @@ export default function SettingsPage() {
         <div className="min-h-screen bg-background p-6 md:p-8 pb-[100px]">
             <div className="max-w-4xl mx-auto space-y-8">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-500 flex items-center gap-3">
+                    <h1 className="text-3xl font-semibold tracking-tight text-foreground flex items-center gap-3">
                         <Settings2 className="w-8 h-8 text-primary" />
                         系统设置
                     </h1>
@@ -188,12 +188,12 @@ export default function SettingsPage() {
 
                 <div className="grid gap-6">
                     {/* General Settings */}
-                    <div className="bg-card border border-border/50 rounded-3xl p-6 shadow-sm">
-                        <div className="flex items-center gap-2 mb-6">
-                            <div className="p-2 bg-blue-500/10 rounded-xl text-blue-500">
+                    <div className="bg-card border border-border rounded-2xl p-6">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-primary/10 rounded-xl text-primary">
                                 <HardDrive className="w-5 h-5" />
                             </div>
-                            <h2 className="text-xl font-semibold">存储设置</h2>
+                            <h2 className="text-lg font-semibold">存储设置</h2>
                         </div>
                         <div className="space-y-4">
                             <div className="space-y-2">
@@ -204,10 +204,10 @@ export default function SettingsPage() {
                                             value={imageDir}
                                             onChange={(e) => setImageDir(e.target.value)}
                                             placeholder="例如：/home/user/ai_images 或 C:\\ai_images"
-                                            className="pr-20 rounded-xl bg-secondary/30 border-border/50"
+                                            className="pr-20"
                                         />
-                                        <Button 
-                                            variant="ghost" 
+                                        <Button
+                                            variant="ghost"
                                             size="sm"
                                             className="absolute right-1 top-1 h-7 rounded-lg text-xs"
                                             onClick={() => setShowDirPicker((v) => !v)}
@@ -215,13 +215,13 @@ export default function SettingsPage() {
                                             浏览
                                         </Button>
                                     </div>
-                                    <Button onClick={saveSettings} className="rounded-xl shrink-0 gap-2 w-full sm:w-auto">
+                                    <Button onClick={saveSettings} className="shrink-0 gap-2 w-full sm:w-auto">
                                         <SaveIcon className="w-4 h-4" />
                                         保存设置
                                     </Button>
                                 </div>
                                 {showDirPicker && (
-                                    <div className="mt-4 p-4 border border-border/50 rounded-2xl bg-secondary/20">
+                                    <div className="mt-4">
                                         <DirectoryPicker
                                             startPath={imageDir}
                                             onClose={() => setShowDirPicker(false)}
@@ -237,12 +237,12 @@ export default function SettingsPage() {
                     </div>
 
                     {/* Model Management */}
-                    <div className="bg-card border border-border/50 rounded-3xl p-6 shadow-sm">
-                        <div className="flex items-center gap-2 mb-6">
-                            <div className="p-2 bg-purple-500/10 rounded-xl text-purple-500">
+                    <div className="bg-card border border-border rounded-2xl p-6">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-primary/10 rounded-xl text-primary">
                                 <Database className="w-5 h-5" />
                             </div>
-                            <h2 className="text-xl font-semibold">模型管理</h2>
+                            <h2 className="text-lg font-semibold">模型管理</h2>
                         </div>
                         <div className="space-y-4">
                             <div className="space-y-2">
@@ -252,9 +252,9 @@ export default function SettingsPage() {
                                         value={newModel}
                                         onChange={(e) => setNewModel(e.target.value)}
                                         placeholder="例如：waiillustriousSDXL_v160.safetensors"
-                                        className="flex-1 rounded-xl bg-secondary/30 border-border/50"
+                                        className="flex-1"
                                     />
-                                    <Button onClick={addModel} variant="secondary" className="rounded-xl shrink-0 gap-2 w-full sm:w-auto hover:bg-primary hover:text-primary-foreground transition-colors">
+                                    <Button onClick={addModel} variant="secondary" className="shrink-0 gap-2 w-full sm:w-auto">
                                         <PlusIcon className="w-4 h-4" />
                                         添加模型
                                     </Button>
@@ -262,15 +262,15 @@ export default function SettingsPage() {
                             </div>
                             <div className="mt-6">
                                 <Label className="text-muted-foreground mb-3 block">已添加的模型</Label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {models.map(m => (
-                                        <div key={m.id} className="flex justify-between items-center bg-secondary/40 border border-border/50 p-3 rounded-2xl group hover:bg-secondary/60 transition-colors">
+                                        <div key={m.id} className="flex justify-between items-center bg-secondary px-3 py-2.5 rounded-xl group">
                                             <span className="text-sm font-medium truncate pr-2">{m.name}</span>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => removeModel(m.id)}
-                                                className="h-8 w-8 rounded-full text-muted-foreground opacity-50 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all shrink-0"
+                                                className="h-7 w-7 rounded-lg text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-opacity shrink-0"
                                             >
                                                 <TrashIcon className="w-4 h-4" />
                                             </Button>
@@ -282,17 +282,17 @@ export default function SettingsPage() {
                     </div>
 
                     {/* Style Management */}
-                    <div className="bg-card border border-border/50 rounded-3xl p-6 shadow-sm">
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className="p-2 bg-pink-500/10 rounded-xl text-pink-500">
+                    <div className="bg-card border border-border rounded-2xl p-6">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 bg-primary/10 rounded-xl text-primary">
                                 <Palette className="w-5 h-5" />
                             </div>
-                            <h2 className="text-xl font-semibold">风格预设管理</h2>
+                            <h2 className="text-lg font-semibold">风格预设管理</h2>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-6">
+                        <p className="text-xs text-muted-foreground mb-6">
                             注意：仅输入来自 WebUI styles.csv 的现有风格名称
                         </p>
-                        
+
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label>添加新风格</Label>
@@ -301,9 +301,9 @@ export default function SettingsPage() {
                                         value={newStyle}
                                         onChange={(e) => setNewStyle(e.target.value)}
                                         placeholder="例如：Lasy 或 NAI3起手-"
-                                        className="flex-1 rounded-xl bg-secondary/30 border-border/50"
+                                        className="flex-1"
                                     />
-                                    <Button onClick={addStyle} variant="secondary" className="rounded-xl shrink-0 gap-2 w-full sm:w-auto hover:bg-primary hover:text-primary-foreground transition-colors">
+                                    <Button onClick={addStyle} variant="secondary" className="shrink-0 gap-2 w-full sm:w-auto">
                                         <PlusIcon className="w-4 h-4" />
                                         添加风格
                                     </Button>
@@ -313,12 +313,12 @@ export default function SettingsPage() {
                                 <Label className="text-muted-foreground mb-3 block">已添加的风格</Label>
                                 <div className="flex flex-wrap gap-2">
                                     {styles.map(s => (
-                                        <div key={s.id} className="flex items-center gap-2 bg-secondary/40 border border-border/50 pl-3 pr-1.5 py-1.5 rounded-full group hover:bg-secondary/60 transition-colors">
+                                        <div key={s.id} className="flex items-center gap-1.5 bg-secondary pl-3 pr-1 py-1.5 rounded-lg group">
                                             <span className="text-sm font-medium">{s.name}</span>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="h-6 w-6 rounded-full text-muted-foreground opacity-50 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all" 
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-opacity"
                                                 onClick={() => removeStyle(s.id)}
                                             >
                                                 <TrashIcon className="w-3.5 h-3.5" />
@@ -331,17 +331,17 @@ export default function SettingsPage() {
                     </div>
 
                     {/* LoRA Management */}
-                    <div className="bg-card border border-border/50 rounded-3xl p-6 shadow-sm">
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className="p-2 bg-orange-500/10 rounded-xl text-orange-500">
+                    <div className="bg-card border border-border rounded-2xl p-6">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 bg-primary/10 rounded-xl text-primary">
                                 <Database className="w-5 h-5" />
                             </div>
-                            <h2 className="text-xl font-semibold">LoRA 管理</h2>
+                            <h2 className="text-lg font-semibold">LoRA 管理</h2>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-6">
+                        <p className="text-xs text-muted-foreground mb-6">
                             添加 LoRA 标签并在下方选择启用。启用的 LoRA 将自动添加到每次生成的提示词中。
                         </p>
-                        
+
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label>添加新 LoRA（格式：&lt;lora:name:weight&gt;）</Label>
@@ -350,9 +350,9 @@ export default function SettingsPage() {
                                         value={newLora}
                                         onChange={(e) => setNewLora(e.target.value)}
                                         placeholder="例如：<lora:cute_style:0.8>"
-                                        className="flex-1 rounded-xl bg-secondary/30 border-border/50"
+                                        className="flex-1"
                                     />
-                                    <Button onClick={addLora} variant="secondary" className="rounded-xl shrink-0 gap-2 w-full sm:w-auto hover:bg-primary hover:text-primary-foreground transition-colors">
+                                    <Button onClick={addLora} variant="secondary" className="shrink-0 gap-2 w-full sm:w-auto">
                                         <PlusIcon className="w-4 h-4" />
                                         添加 LoRA
                                     </Button>
@@ -364,16 +364,16 @@ export default function SettingsPage() {
                                     {loras.map(l => {
                                         const isActive = activeLoras.includes(l.name)
                                         return (
-                                            <div 
-                                                key={l.id} 
-                                                className={`flex items-center gap-2 border pl-3 pr-1.5 py-1.5 rounded-full group transition-colors cursor-pointer select-none ${isActive ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-secondary/40 border-border/50 hover:bg-secondary/60'}`}
+                                            <div
+                                                key={l.id}
+                                                className={`flex items-center gap-1.5 border pl-3 pr-1 py-1.5 rounded-lg group transition-colors cursor-pointer select-none ${isActive ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-secondary border-transparent hover:bg-secondary/80'}`}
                                                 onClick={() => toggleActiveLora(l.name)}
                                             >
                                                 <span className="text-sm font-medium">{l.name}</span>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-6 w-6 rounded-full text-muted-foreground opacity-50 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all" 
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-opacity"
                                                     onClick={(e) => {
                                                         e.stopPropagation()
                                                         removeLora(l.id)

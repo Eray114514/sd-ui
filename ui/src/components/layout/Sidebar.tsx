@@ -4,11 +4,11 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
-    Bell,
     MessageSquare,
     Package,
     Palette,
-    Settings2
+    Settings2,
+    Code2
 } from "lucide-react"
 
 export function Sidebar() {
@@ -30,24 +30,23 @@ export function Sidebar() {
     ]
 
     return (
-        <aside className="fixed left-0 top-0 z-50 h-screen w-[80px] flex flex-col items-center bg-card border-r border-border py-6 transition-all hidden lg:flex">
-            {/* Logo */}
-            <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-purple-600 shadow-lg shadow-primary/20 mb-2 cursor-pointer hover:scale-105 transition-transform duration-200">
-                <Palette className="w-[22px] h-[22px] text-white" />
-            </div>
+        <aside className="fixed left-0 top-0 z-50 h-screen w-[80px] flex flex-col items-center bg-background border-r border-border py-6 transition-all hidden lg:flex">
+            <Link href="/" className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity duration-150">
+                <Palette className="w-5 h-5" />
+            </Link>
 
-            <nav className="flex-1 flex flex-col gap-4 mt-6 w-full px-3">
+            <nav className="flex-1 flex flex-col gap-2 mt-8 w-full px-3">
                 {navItems.map((item) => (
                     <Link key={item.href} href={item.href} className="w-full">
                         <div
                             className={cn(
-                                "w-full flex flex-col items-center justify-center py-3 rounded-2xl transition-all duration-200 gap-1.5 cursor-pointer",
+                                "w-full flex flex-col items-center justify-center py-3 rounded-xl transition-colors duration-150 gap-1.5 cursor-pointer",
                                 item.isActive
                                     ? "bg-primary/10 text-primary"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                             )}
                         >
-                            <item.icon className={cn("w-6 h-6", item.isActive && "text-primary")} strokeWidth={item.isActive ? 2.5 : 2} />
+                            <item.icon className={cn("w-5 h-5", item.isActive && "text-primary")} strokeWidth={item.isActive ? 2.5 : 2} />
                             <span className={cn("text-[11px] font-medium", item.isActive ? "text-primary" : "")}>
                                 {item.label}
                             </span>
@@ -56,34 +55,23 @@ export function Sidebar() {
                 ))}
             </nav>
 
-            <div className="flex flex-col items-center gap-6 pb-2 w-full">
-                {/* Avatar */}
-                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-bold shadow-sm cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all">
-                    U
-                </div>
-
-                {/* API */}
+            <div className="flex flex-col items-center gap-4 pb-2 w-full">
                 <Link href="/api-docs">
                     <div className={cn(
-                        "text-[11px] font-bold cursor-pointer transition-colors p-1 rounded-md",
-                        pathname === "/api-docs" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary"
+                        "flex flex-col items-center justify-center py-2.5 rounded-xl transition-colors cursor-pointer gap-1",
+                        pathname === "/api-docs" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                     )}>
-                        API
+                        <Code2 className="w-5 h-5" />
+                        <span className="text-[10px] font-medium">API</span>
                     </div>
                 </Link>
 
-                {/* Bell */}
-                <div className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors p-1">
-                    <Bell className="w-[22px] h-[22px]" />
-                </div>
-
-                {/* Settings */}
                 <Link href="/settings">
                     <div className={cn(
-                        "cursor-pointer p-2 rounded-xl transition-colors",
-                        pathname === "/settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                        "flex items-center justify-center w-10 h-10 rounded-xl transition-colors cursor-pointer",
+                        pathname === "/settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                     )} title="系统设置">
-                        <Settings2 className="w-6 h-6" />
+                        <Settings2 className="w-5 h-5" />
                     </div>
                 </Link>
             </div>

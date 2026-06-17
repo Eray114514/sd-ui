@@ -157,7 +157,7 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[95vw] sm:max-w-[90vw] lg:max-w-[1200px] h-[90vh] sm:h-[85vh] p-0 flex flex-col md:flex-row overflow-hidden bg-background border-border">
+      <DialogContent className="max-w-[95vw] sm:max-w-[90vw] lg:max-w-[1200px] h-[90vh] sm:h-[85vh] p-0 flex flex-col md:flex-row overflow-hidden bg-card border-border rounded-2xl">
         <VisuallyHidden>
             <DialogTitle>Image Details</DialogTitle>
         </VisuallyHidden>
@@ -171,15 +171,15 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
         </div>
 
         <div className="w-full md:w-[30%] h-[50%] md:h-full flex flex-col border-t md:border-t-0 md:border-l border-border bg-background overflow-hidden">
-          <div className="p-4 border-b border-border flex justify-between items-center bg-background/95 backdrop-blur z-10 sticky top-0 shrink-0">
-            <div className="text-sm text-muted-foreground font-medium">
+          <div className="p-4 border-b border-border flex justify-between items-center bg-card/95 z-10 sticky top-0 shrink-0">
+            <div className="text-xs text-muted-foreground font-mono">
               {new Date(currentImage.createdAt).toLocaleString()}
             </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="icon" className="hover:bg-muted rounded-full" onClick={handleDownload} title="下载原图">
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon-sm" className="rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={handleDownload} title="下载原图">
                 <DownloadIcon className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="hover:bg-muted rounded-full" onClick={handleFavorite} disabled={isFavoriteLoading} title={currentImage.isFavorite ? "取消收藏" : "收藏"}>
+              <Button variant="ghost" size="icon-sm" className="rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={handleFavorite} disabled={isFavoriteLoading} title={currentImage.isFavorite ? "取消收藏" : "收藏"}>
                 {isFavoriteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <StarIcon className={`w-4 h-4 ${currentImage.isFavorite ? "fill-yellow-500 text-yellow-500" : ""}`} />}
               </Button>
               <Popover open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -187,7 +187,7 @@ export function ImageDetailModal({ image, isOpen, onClose, onDeleted, relatedIma
                   render={
                     <button
                       type="button"
-                      className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
                       title="删除图片"
                       onClick={() => setIsDeleteDialogOpen(true)}
                       disabled={isDeleting}

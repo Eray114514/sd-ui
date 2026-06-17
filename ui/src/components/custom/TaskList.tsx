@@ -205,9 +205,16 @@ export function TaskList({ initialTasks }: TaskListProps) {
 
   return (
     <>
-      <div className="w-full px-4 pt-6 pb-[20px] flex flex-col items-center">
-      <div className="w-full max-w-4xl flex flex-col gap-8">
-        {tasks.length === 0 && <p className="text-muted-foreground text-center mt-20">暂无生成记录，开始你的创作吧</p>}
+      <div className="w-full px-4 pt-8 pb-[20px] flex flex-col items-center">
+      <div className="w-full max-w-4xl flex flex-col gap-10">
+        {tasks.length === 0 && (
+          <div className="flex flex-col items-center text-muted-foreground mt-20 gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18"/><path d="M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+            </div>
+            <p className="text-sm">暂无生成记录，开始你的创作吧</p>
+          </div>
+        )}
 
         {selectedImage && (
           <ImageDetailModal

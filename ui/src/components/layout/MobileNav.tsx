@@ -47,54 +47,46 @@ export function MobileNav() {
 
     return (
         <>
-            <header className="fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-b border-border lg:hidden pt-[env(safe-area-inset-top)]">
+            <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 border-b border-border lg:hidden pt-[env(safe-area-inset-top)]">
                 <div className="flex items-center justify-between h-14 px-4">
-                    {/* Logo */}
                     <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
-                        <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-purple-600 shadow-lg shadow-primary/20">
-                            <Palette className="w-[18px] h-[18px] text-white" />
+                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground">
+                            <Palette className="w-4 h-4" />
                         </div>
-                        <span className="font-bold text-sm tracking-tight text-foreground">SD-UI</span>
+                        <span className="font-semibold text-sm tracking-tight text-foreground">SD-UI</span>
                     </Link>
 
-                    {/* Right section: Avatar & Hamburger */}
-                    <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-500 flex items-center justify-center text-white text-[11px] font-bold shadow-sm">
-                            U
-                        </div>
-                        <button 
-                            onClick={() => setIsOpen(!isOpen)}
-                            className="p-1.5 -mr-1.5 text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            {isOpen ? <X className="w-[22px] h-[22px]" /> : <Menu className="w-[22px] h-[22px]" />}
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="p-1.5 -mr-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        {isOpen ? <X className="w-[22px] h-[22px]" /> : <Menu className="w-[22px] h-[22px]" />}
+                    </button>
                 </div>
             </header>
 
-            {/* Mobile Menu Overlay */}
-            <div 
+            <div
                 className={cn(
-                    "fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden transition-all duration-300 pt-[calc(3.5rem+env(safe-area-inset-top))]",
+                    "fixed inset-0 z-40 bg-background/80 lg:hidden transition-all duration-200 pt-[calc(3.5rem+env(safe-area-inset-top))]",
                     isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
                 )}
             >
-                <div 
+                <div
                     className={cn(
-                        "flex flex-col gap-2 p-4 transition-transform duration-300 ease-out",
-                        isOpen ? "translate-y-0" : "-translate-y-4"
+                        "flex flex-col gap-2 p-4 transition-transform duration-200 ease-out",
+                        isOpen ? "translate-y-0" : "-translate-y-2"
                     )}
                 >
                     {navItems.map((item) => (
-                        <Link 
-                            key={item.href} 
-                            href={item.href} 
+                        <Link
+                            key={item.href}
+                            href={item.href}
                             onClick={() => setIsOpen(false)}
                             className={cn(
-                                "flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all active:scale-95",
+                                "flex items-center gap-3 px-4 py-3.5 rounded-xl transition-colors active:scale-95",
                                 item.isActive
                                     ? "bg-primary/10 text-primary font-medium"
-                                    : "bg-card text-muted-foreground border border-border/50 hover:bg-accent/50 hover:text-foreground"
+                                    : "bg-card text-muted-foreground border border-border hover:bg-secondary hover:text-foreground"
                             )}
                         >
                             <item.icon className={cn("w-[22px] h-[22px]", item.isActive && "text-primary")} strokeWidth={item.isActive ? 2.5 : 2} />

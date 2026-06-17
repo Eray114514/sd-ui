@@ -62,15 +62,16 @@ export function DirectoryPicker({ startPath, onSelect, onClose }: DirectoryPicke
   }, [startPath, load])
 
   return (
-    <div className="rounded-xl border border-border bg-muted/40 p-3">
+    <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-xs text-muted-foreground truncate">
+        <div className="text-xs text-muted-foreground font-mono truncate">
           {current || "计算机"}
         </div>
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon-sm"
+            className="rounded-lg"
             disabled={!parent || loading}
             onClick={() => parent && load(parent)}
             title="上一级"
@@ -80,13 +81,14 @@ export function DirectoryPicker({ startPath, onSelect, onClose }: DirectoryPicke
           <Button
             variant="ghost"
             size="icon-sm"
+            className="rounded-lg"
             disabled={loading}
             onClick={() => load(current || undefined)}
             title="刷新"
           >
             <RefreshCwIcon className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={onClose} title="关闭">
+          <Button variant="ghost" size="icon-sm" className="rounded-lg" onClick={onClose} title="关闭">
             <XIcon className="w-4 h-4" />
           </Button>
         </div>
@@ -105,7 +107,7 @@ export function DirectoryPicker({ startPath, onSelect, onClose }: DirectoryPicke
               <Button
                 key={entry.path}
                 variant="ghost"
-                className="w-full justify-start text-xs"
+                className="w-full justify-start rounded-lg text-sm h-9"
                 onClick={() => load(entry.path)}
               >
                 <FolderIcon className="w-4 h-4 mr-2 text-muted-foreground" />
@@ -116,16 +118,17 @@ export function DirectoryPicker({ startPath, onSelect, onClose }: DirectoryPicke
         </ScrollArea>
       </div>
 
-      <div className="mt-3 flex justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={onClose}>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button variant="outline" size="sm" className="rounded-xl" onClick={onClose}>
           取消
         </Button>
         <Button
           size="sm"
+          className="rounded-xl gap-2"
           disabled={!current}
           onClick={() => current && onSelect(current)}
         >
-          <CheckIcon className="w-4 h-4 mr-2" />
+          <CheckIcon className="w-4 h-4" />
           使用此文件夹
         </Button>
       </div>
